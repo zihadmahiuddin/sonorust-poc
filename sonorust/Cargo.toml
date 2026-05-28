@@ -3,17 +3,30 @@ name = "sonorust"
 version = "0.1.0"
 edition = "2024"
 
+default-run = "sonorust"
+
+[[bin]]
+name = "shader-test"
+path = "./bin/shader-test.rs"
+
 [dependencies]
-bevy = { workspace =  true }
+bevy = { workspace = true }
 bevy-inspector-egui = "0.31.0"
 bevy_egui = "0.34.1"
 bevy_kira_audio = { version = "0.23.0", features = ["mp3"] }
 flate2 = "1.1.1"
+image = "0.25.6"
 log = { workspace = true }
 minreq = { version = "2.13.4", features = ["json-using-serde", "https-rustls"] }
 ordered-float = "5.0.0"
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.140"
+rand = "0.9.1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+
 sonorust-interpreter = { workspace = true }
 sonorust-macros = { workspace = true }
-
+sonorust-memory = { workspace = true }
+sonorust-model = { workspace = true }
+sonorust-rest = { workspace = true }
+bytemuck = "1.25.0"

@@ -1,6 +1,14 @@
 [workspace]
 resolver = "2"
-members = ["sonorust-interpreter", "sonorust", "sonorust-macros"]
+members = [
+  "sonorust-interpreter",
+  "sonorust",
+  "sonorust-macros",
+  "sonorust-memory",
+  "sonorust-model",
+  "sonorust-rest",
+]
+default-members = ["sonorust"]
 
 [workspace.dependencies]
 bevy = { version = "0.16.0", features = [
@@ -40,8 +48,15 @@ log = { version = "*", features = [
   "max_level_debug",
   "release_max_level_warn",
 ] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+tracing = "0.1.41"
+
+sonorust-model = { path = "./sonorust-model" }
 sonorust-interpreter = { path = "./sonorust-interpreter" }
 sonorust-macros = { path = "./sonorust-macros" }
+sonorust-memory = { path = "./sonorust-memory" }
+sonorust-rest = { path = "./sonorust-rest" }
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]

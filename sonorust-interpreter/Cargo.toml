@@ -5,4 +5,11 @@ edition = "2024"
 
 [dependencies]
 bevy = { workspace = true }
+num-traits = "0.2.19"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
 
+sonorust-macros = { workspace = true }
+sonorust-memory = { workspace = true }
+sonorust-model = { workspace = true }
