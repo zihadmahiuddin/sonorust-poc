@@ -5,4 +5,3 @@ pub mod life;
 pub mod memory;
 pub mod option;
 pub mod score;
-

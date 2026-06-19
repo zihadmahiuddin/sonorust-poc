@@ -232,13 +232,13 @@ fn update_quad_corners(
         }
     }
 
-    if let Ok(mat_handle) = material_handle.single() {
-        if let Some(mat) = materials.get_mut(mat_handle) {
-            dbg!(projected);
-            mat.quad_corners.bottom_left = projected[0];
-            mat.quad_corners.bottom_right = projected[1];
-            mat.quad_corners.top_left = projected[2];
-            mat.quad_corners.top_right = projected[3];
-        }
+    if let Ok(mat_handle) = material_handle.single()
+        && let Some(mat) = materials.get_mut(mat_handle)
+    {
+        dbg!(projected);
+        mat.quad_corners.bottom_left = projected[0];
+        mat.quad_corners.bottom_right = projected[1];
+        mat.quad_corners.top_left = projected[2];
+        mat.quad_corners.top_right = projected[3];
     }
 }

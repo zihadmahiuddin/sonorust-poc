@@ -118,22 +118,22 @@ impl OpcodeRegistryInput {
 
             // 3. CORRECTED LOGIC: Build assignments using direct indexing into partitioned vectors.
             let mut leading_idx = 0;
-            let mut trailing_idx = 0;
+            let mut _trailing_idx = 0;
             let assignments = entry.fields.iter().enumerate().map(|(i, field)| {
                 match field {
                     OpcodeField::Rest(ident) => {
                         quote! { #ident: rest_args }
                     }
                     OpcodeField::Normal(ident) => {
-                        if rest_position.map_or(true, |pos| i < pos) {
+                        if rest_position.is_none_or(|pos| i < pos) {
                             // It's a leading field. Use an index into `leading_args`.
                             let idx = syn::Index::from(leading_idx);
                             leading_idx += 1;
                             quote! { #ident: leading_args[#idx] }
                         } else {
                             // It's a trailing field. Use an index into `trailing_args`.
-                            let idx = syn::Index::from(trailing_idx);
-                            trailing_idx += 1;
+                            let idx = syn::Index::from(_trailing_idx);
+                            _trailing_idx += 1;
                             quote! { #ident: trailing_args[#idx] }
                         }
                     }

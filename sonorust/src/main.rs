@@ -493,7 +493,7 @@ fn sequential_update(
     }
 
     for (entity_id, entity) in entity_id_to_entity_map.iter() {
-        if memory.entity_info_array.entry(&entity_id).unwrap().state != EntityState::Active {
+        if memory.entity_info_array.entry(entity_id).unwrap().state != EntityState::Active {
             continue;
         }
 
@@ -663,6 +663,7 @@ fn terminate_callback(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn presentation(
     entities: Query<((&mut Transform, &Mesh2d, &ArchetypeId), &EntityId)>,
     entities2: Query<&Entity>,
@@ -1092,6 +1093,7 @@ impl Plugin for SonorustPlugin {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn pre_startup(
     mut commands: Commands,
     server: Res<SonolusServer>,
@@ -1329,7 +1331,7 @@ fn pre_startup(
 
     // The order of sprites in SonolusSkinData.sprites must match the order
     // you expect for atlas_index (e.g., first sprite in JSON is atlas_index 0, etc.)
-    for (_, engine_skin_sprite) in engine_play_data.skin.sprites.iter().enumerate() {
+    for engine_skin_sprite in engine_play_data.skin.sprites.iter() {
         let Some(sprite_data) = sprite_name_to_data.get(&engine_skin_sprite.name) else {
             continue;
         };

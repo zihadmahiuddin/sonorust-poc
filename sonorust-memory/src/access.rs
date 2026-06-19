@@ -10,10 +10,10 @@ use sonorust_model::{
         despawn_array::EntityDespawn,
         info::{EntityInfo, EntityInfoArray},
         input::EntityInputArray,
-        memory::{EntityMemory, EntityMemoryArray},
-        shared_memory_array::{EntitySharedMemory, EntitySharedMemoryArray},
         life::EntityLife,
-        score::EntityScore
+        memory::{EntityMemory, EntityMemoryArray},
+        score::EntityScore,
+        shared_memory_array::{EntitySharedMemory, EntitySharedMemoryArray},
     },
     level::{
         bucket::LevelBucket, data::LevelDataMemory, life::LevelLife, memory::LevelMemory,

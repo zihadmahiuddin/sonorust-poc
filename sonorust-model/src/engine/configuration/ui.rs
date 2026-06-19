@@ -42,5 +42,3 @@ pub struct AnimatedValue {
     pub duration: f64,
     pub ease: String,
 }
-
-
