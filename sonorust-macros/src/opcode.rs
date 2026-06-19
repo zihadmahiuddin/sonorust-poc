@@ -63,7 +63,7 @@ impl Parse for OpcodeField {
 }
 
 impl OpcodeRegistryInput {
-    fn expand(&self) -> proc_macro2::TokenStream {
+    fn expand(&self) -> quote2::proc_macro2::TokenStream {
         let mut struct_defs = Vec::new();
         let mut match_arms = Vec::new();
         let mut execute_match_arms = Vec::new();
