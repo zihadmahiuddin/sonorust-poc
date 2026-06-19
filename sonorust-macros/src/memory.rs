@@ -1,68 +1,59 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap as Map, HashSet as Set};
 
 use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::parse::{Parse, ParseStream, Result};
-use syn::{Ident, Token, bracketed};
+use syn::{
+    parse::{Parse, ParseBuffer, ParseStream, Result},
+    *,
+};
 
 pub struct MemoryAccessInput {
     blocks: Vec<Ident>,
-    mutability_by_stage: HashMap<Ident, HashSet<Ident>>,
+    mutability_by_stage: Map<Ident, Set<Ident>>,
 }
 
 impl Parse for MemoryAccessInput {
     fn parse(input: ParseStream) -> Result<Self> {
-        let blocks_content;
-        bracketed!(blocks_content in input);
         let mut blocks = Vec::new();
 
-        while !blocks_content.is_empty() {
-            let name: Ident = blocks_content.parse()?;
-            blocks.push(name);
-
-            // Optional comma after individual item
-            let _ = blocks_content.parse::<Token![,]>();
+        let c;
+        bracketed!(c in input);
+        while !c.is_empty() {
+            blocks.push(parse_ident::<Token![,]>(&c)?);
         }
 
-        // Optional comma after bracket end
-        let _ = input.parse::<Token![,]>();
-
-        let mut mutability_by_stage = HashMap::new();
+        let mut mutability_by_stage = Map::new();
 
         while !input.is_empty() {
-            let stage_name: Ident = input.parse()?;
-            input.parse::<Token![:]>()?;
+            let stage_name = parse_ident::<Token![:]>(input)?;
 
-            let mutable_blocks_content;
-            bracketed!(mutable_blocks_content in input);
-
-            while !mutable_blocks_content.is_empty() {
-                let block_name: Ident = mutable_blocks_content.parse()?;
-
-                // Optional comma after individual item
-                let _ = mutable_blocks_content.parse::<Token![,]>();
+            let c;
+            bracketed!(c in input);
+            while !c.is_empty() {
+                let block_name = parse_ident::<Token![,]>(&c)?;
 
                 mutability_by_stage
                     .entry(stage_name.clone())
-                    .and_modify(|items: &mut HashSet<_>| {
+                    .and_modify(|items: &mut Set<_>| {
                         items.insert(block_name.clone());
                     })
-                    .or_insert(HashSet::from([block_name]));
+                    .or_insert(Set::from([block_name]));
             }
-
-            // Optional comma after individual item
-            let _ = mutable_blocks_content.parse::<Token![,]>();
         }
-
-        // Optional comma after bracket end
-        let _ = input.parse::<Token![,]>();
 
         Ok(MemoryAccessInput {
             blocks,
             mutability_by_stage,
         })
     }
+}
+
+fn parse_ident<Sep: Parse>(input: &ParseBuffer<'_>) -> Result<Ident> {
+    let name = input.parse()?;
+    // Optional comma after individual item
+    let _ = input.parse::<Sep>();
+    Ok(name)
 }
 
 pub fn generate_memory_access(input: MemoryAccessInput) -> TokenStream {
