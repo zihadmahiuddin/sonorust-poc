@@ -6,7 +6,7 @@ use syn::Token;
 use syn::parse::{Parse, ParseStream, Result};
 use syn::{Ident, braced};
 
-struct OpcodeRegistryInput {
+pub struct OpcodeRegistryInput {
     entries: Vec<OpcodeEntry>,
 }
 
@@ -272,7 +272,6 @@ impl OpcodeRegistryInput {
     }
 }
 
-pub fn opcode_registry(input: TokenStream) -> TokenStream {
-    let input = syn::parse_macro_input!(input as OpcodeRegistryInput);
+pub fn opcode_registry(input: OpcodeRegistryInput) -> TokenStream {
     input.expand().into()
 }

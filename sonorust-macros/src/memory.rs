@@ -1,12 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
 use heck::ToSnakeCase;
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream, Result};
-use syn::{Ident, Token, bracketed, parse_macro_input};
+use syn::{Ident, Token, bracketed};
 
-struct MemoryAccessInput {
+pub struct MemoryAccessInput {
     blocks: Vec<Ident>,
     mutability_by_stage: HashMap<Ident, HashSet<Ident>>,
 }
@@ -65,11 +65,11 @@ impl Parse for MemoryAccessInput {
     }
 }
 
-pub fn generate_memory_access(item: TokenStream) -> TokenStream {
+pub fn generate_memory_access(input: MemoryAccessInput) -> TokenStream {
     let MemoryAccessInput {
         blocks,
         mutability_by_stage,
-    } = parse_macro_input!(item as MemoryAccessInput);
+    } = input;
 
     let structs = mutability_by_stage
         .iter()
@@ -151,5 +151,5 @@ pub fn generate_memory_access(item: TokenStream) -> TokenStream {
         #(#structs)*
     };
 
-    output.into()
+    output
 }
