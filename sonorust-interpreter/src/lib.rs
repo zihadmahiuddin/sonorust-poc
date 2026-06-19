@@ -6,9 +6,7 @@ pub(crate) mod util;
 
 use access::{MemoryAccess, SideEffectAccess, TimingAccess};
 use node::ResolvedNode;
-use opcode::OpCode;
 use sonorust_model::entity::EntityId;
-use tracing::info;
 
 #[derive(Debug)]
 pub enum ControlFlowState {

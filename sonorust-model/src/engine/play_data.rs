@@ -37,6 +37,7 @@ pub struct Bucket {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(unused)]
 pub struct BucketSprite {
     id: i64,
     fallback_id: Option<i64>,
@@ -49,6 +50,7 @@ pub struct BucketSprite {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(unused)]
 pub struct Skin {
     render_mode: Option<SkinRenderMode>,
     pub sprites: Vec<Sprite>,

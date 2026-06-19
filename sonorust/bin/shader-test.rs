@@ -1,3 +1,4 @@
+#![allow(unused)]
 use bevy::{
     asset::RenderAssetUsages,
     pbr::{MaterialPipeline, MaterialPipelineKey},

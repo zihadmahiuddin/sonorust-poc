@@ -1,3 +1,4 @@
+#![allow(unused)]
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     io::{BufReader, Cursor, Read},
