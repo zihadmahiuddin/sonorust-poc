@@ -600,16 +600,15 @@ fn despawning(
 
     let despawned_entities = entity_despawn.items.clone();
     for despawned_entity_id in despawned_entities {
-        dbg!(despawned_entity_id);
         let entity_info = entity_info_array.entry_mut(&despawned_entity_id).unwrap();
-        // if entity_info.state == EntityState::Despawned {
-        //     continue;
-        // }
+        if entity_info.state == EntityState::Despawned {
+            continue;
+        }
 
-        // entity_info.state = EntityState::Despawned;
-        // entity_despawn.remove(&despawned_entity_id);
+        entity_info.state = EntityState::Despawned;
+        entity_despawn.remove(&despawned_entity_id);
         if let Some(entity) = entity_map.get(&despawned_entity_id) {
-            // commands.entity(*entity).despawn();
+            commands.entity(*entity).despawn();
         }
     }
 }
@@ -665,8 +664,7 @@ fn terminate_callback(
 
 #[allow(clippy::too_many_arguments)]
 fn presentation(
-    entities: Query<((&mut Transform, &Mesh2d, &ArchetypeId), &EntityId)>,
-    entities2: Query<&Entity>,
+    entities: Query<((&mut Transform, &Mesh2d, &EntityId))>,
     mut meshes: ResMut<Assets<Mesh>>,
     sonolus_sprite_lookup: Res<SonolusSpriteLookup>,
     atlas_resources: Res<TextureAtlasResources>, // For atlas image info
@@ -680,16 +678,17 @@ fn presentation(
     };
     let atlas_size = Vec2::new(atlas_image.width() as f32, atlas_image.height() as f32);
 
-    // for entity in entities2.iter() {
-    //     dbg!(entity.id, entity.archetype_id);
-    // }
-
     let mut entity_map = entities
         .into_iter()
-        .map(|(a, b)| (*b, a))
+        .map(|(a, b, c)| (*c, (a, b)))
         .collect::<HashMap<_, _>>();
+
     for (entity_id, effects) in &side_effects.draws {
-        let Some((_entity_transform, mesh_2d, archetype_id)) = entity_map.get_mut(entity_id) else {
+        let Some((_entity_transform, mesh_2d)) = entity_map.get_mut(entity_id) else {
+            error!(
+                "Entity {} could not be drawn as it was not found in the entity map.",
+                entity_id.0
+            );
             continue;
         };
 
