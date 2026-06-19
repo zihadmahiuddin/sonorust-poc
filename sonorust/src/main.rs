@@ -74,11 +74,11 @@ use sonorust_model::{
 use sonorust_rest::{client::SonorustRestClient, extension::LevelInfoExt};
 
 fn main() {
-    // let server = "http://localhost:8080";
-    // let level = "dev";
+    let server = "http://localhost:8080";
+    let level = "dev";
 
-    let server = "https://sonolus.sekai.best";
-    let level = "sekai-best-429-1416-expert";
+    // let server = "https://sonolus.sekai.best";
+    // let level = "sekai-best-429-1416-expert";
 
     // let server = "https://coconut.sonolus.com/horizon/";
     // let level = "coconut-horizon-83";
