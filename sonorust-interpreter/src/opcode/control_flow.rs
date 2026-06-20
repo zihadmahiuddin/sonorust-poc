@@ -12,23 +12,21 @@ impl<E, M, S, T> Executable<E, M, S, T> for Execute {
         S: SideEffectAccess,
         T: TimingAccess,
     {
-        let mut last_result: f64 = 0.0;
+        let mut value: f64 = 0.0;
 
-        for &node_index in &self.nodes {
+        for &node in &self.nodes {
             // Check the program flow before executing the next operation.
-            match executor.control() {
-                ControlFlow::Break(_) => {
-                    // If a break is active, stop executing further opcodes in this sequence.
-                    // The Block containing this sequence will handle the break state.
-                    return last_result; // Or the break value if accessible
-                }
-                ControlFlow::Continue(()) => {
-                    // Proceed to execute the current operation.
-                }
+            if executor.control().is_break() {
+                // If a break is active, stop executing further opcodes in this sequence.
+                // The Block containing this sequence will handle the break state.
+                break; // Or the break value if accessible
             }
-            last_result = executor.execute(node_index);
+
+            // Proceed to execute the current operation.
+            value = executor.execute(node);
+            // println!("value: {:#?}", value);
         }
-        last_result
+        value
     }
 }
 
@@ -58,21 +56,15 @@ impl<E, M, S, T> Executable<E, M, S, T> for Block {
         S: SideEffectAccess,
         T: TimingAccess,
     {
-        let result = match executor.control_mut() {
-            ControlFlow::Break(stack) if stack.len() == 1 => Some((0.0, ControlFlow::Continue(()))),
-            ControlFlow::Break(stack) => {
+        match executor.take_control() {
+            ControlFlow::Continue(()) => executor.execute(self.body),
+            ControlFlow::Break(stack) if stack.len() == 1 => 0.0,
+            ControlFlow::Break(mut stack) => {
                 let last = stack.pop().unwrap_or_default();
-                Some((last, ControlFlow::Break(stack.clone())))
+                executor.set_control(ControlFlow::Break(stack));
+                last
             }
-            _ => None,
-        };
-
-        if let Some((value, control)) = result {
-            executor.with_control(control);
-            return value;
         }
-
-        executor.execute(self.body)
     }
 }
 
@@ -89,15 +81,17 @@ impl<E, M, S, T> Executable<E, M, S, T> for Break {
             .unwrap_or_else(|| panic!("Expected break count to be valid usize, found {count}"));
 
         let value = executor.execute(self.value);
-        let mut stack = match executor.control() {
+
+        let mut stack = match executor.take_control() {
+            ControlFlow::Break(stack) => stack,
             ControlFlow::Continue(()) => vec![],
-            ControlFlow::Break(stack) => stack.clone(),
         };
 
-        for _ in 0usize..count {
+        for _ in 0..count {
             stack.push(value);
         }
-        executor.with_control(ControlFlow::Break(stack));
+
+        executor.set_control(ControlFlow::Break(stack));
         value
     }
 }
@@ -302,25 +296,26 @@ mod tests {
             ResolvedNode::Value(1.0),
             ResolvedNode::Value(2.0),
             ResolvedNode::Value(3.0),
-            ResolvedNode::OpCode(OpCode::Add(Add { inputs: vec![1, 2] })),
-            ResolvedNode::OpCode(OpCode::Break(Break { count: 0, value: 1 })),
-            ResolvedNode::OpCode(OpCode::Subtract(Subtract { inputs: vec![2, 1] })),
+            ResolvedNode::OpCode(OpCode::Add(Add { inputs: vec![1, 2] })), // value: 2 + 3 = 5
+            ResolvedNode::OpCode(OpCode::Break(Break { count: 0, value: 1 })), // stack (len: 1) = [value: 2] -> 2
+            ResolvedNode::OpCode(OpCode::Subtract(Subtract { inputs: vec![2, 1] })), // Did not execute; value: 3 - 2 = 1;
             ResolvedNode::OpCode(OpCode::Execute(Execute {
                 nodes: vec![3, 4, 5],
             })),
             ResolvedNode::OpCode(OpCode::Block(Block { body: 6 })),
         ];
+
         let mut memory_access = NoOp;
         let mut side_effect_access = NoOp;
-        let timing_access = NoOp;
         let mut interpreter = IterativeInterpreter::new(
             EntityId(0),
             &nodes,
             &mut memory_access,
             &mut side_effect_access,
-            &timing_access,
+            &NoOp,
         );
+
         let result = interpreter.execute(7);
-        assert_eq!(result, 1.0);
+        assert_eq!(result, 2.0);
     }
 }

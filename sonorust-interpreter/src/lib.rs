@@ -4,7 +4,7 @@ pub mod opcode;
 pub mod side_effect;
 pub(crate) mod util;
 
-use std::ops::ControlFlow;
+use std::{mem, ops::ControlFlow};
 
 use access::{MemoryAccess, SideEffectAccess, TimingAccess};
 use node::ResolvedNode;
@@ -23,9 +23,13 @@ pub trait Executable<E, M, S, T> {
 }
 
 pub trait Executor<M: MemoryAccess, S: SideEffectAccess, T: TimingAccess>: Sized {
-    fn with_control(&mut self, flow: ControlFlowState);
+    fn set_control(&mut self, flow: ControlFlowState);
     fn control(&self) -> &ControlFlowState;
     fn control_mut(&mut self) -> &mut ControlFlowState;
+    fn take_control(&mut self) -> ControlFlowState {
+        mem::replace(self.control_mut(), ControlFlow::Continue(()))
+    }
+
     fn timing_access(&self) -> &T;
     fn target_entity(&self) -> EntityId;
     fn side_effect_access(&mut self) -> &mut S;
@@ -67,7 +71,7 @@ where
     S: SideEffectAccess,
     T: TimingAccess,
 {
-    fn with_control(&mut self, flow: ControlFlowState) {
+    fn set_control(&mut self, flow: ControlFlowState) {
         self.control_flow = flow;
     }
 
@@ -97,74 +101,6 @@ where
 
     fn execute(&mut self, node_index: usize) -> Value {
         let node = &self.nodes[node_index];
-        // match node {
-        //     ResolvedNode::Value(_) => {}
-        //     ResolvedNode::OpCode(opcode) => match opcode {
-        //         OpCode::Abs(_) => {}
-        //         OpCode::Negate(_) => {}
-        //         OpCode::Add(_) => {}
-        //         OpCode::Subtract(_) => {}
-        //         OpCode::Multiply(_) => {}
-        //         OpCode::Divide(_) => {}
-        //         OpCode::Mod(_) => {}
-        //         OpCode::Rem(_) => {}
-        //         OpCode::Power(_) => {}
-        //         OpCode::Clamp(_) => {}
-        //         OpCode::Lerp(_) => {}
-        //         OpCode::Unlerp(_) => {}
-        //         OpCode::UnlerpClamped(_) => {}
-        //         OpCode::Min(_) => {}
-        //         OpCode::Max(_) => {}
-        //         OpCode::Remap(_) => {}
-        //         OpCode::Round(_) => {}
-        //         OpCode::Floor(_) => {}
-        //         OpCode::Ceil(_) => {}
-        //         OpCode::Sin(_) => {}
-        //         OpCode::Cos(_) => {}
-        //         OpCode::Arctan2(_) => {}
-        //         OpCode::EaseInCubic(_) => {}
-        //         OpCode::EaseInQuad(_) => {}
-        //         OpCode::EaseOutQuad(_) => {}
-        //         OpCode::Equal(_) => {}
-        //         OpCode::NotEqual(_) => {}
-        //         OpCode::Greater(_) => {}
-        //         OpCode::GreaterOr(_) => {}
-        //         OpCode::Less(_) => {}
-        //         OpCode::LessOr(_) => {}
-        //         OpCode::And(_) => {}
-        //         OpCode::Or(_) => {}
-        //         OpCode::Not(_) => {}
-        //         OpCode::Get(_) => {}
-        //         OpCode::GetShifted(_) => {}
-        //         OpCode::Set(_) => {}
-        //         OpCode::SetAdd(_) => {}
-        //         OpCode::SetMultiply(_) => {}
-        //         OpCode::SetShifted(_) => {}
-        //         OpCode::Spawn(_) => {}
-        //         OpCode::Draw(_) => {}
-        //         OpCode::BeatToTime(_) => {}
-        //         OpCode::BeatToBPM(_) => {}
-        //         OpCode::TimeToScaledTime(_) => {}
-        //         OpCode::DebugLog(_) => {}
-        //         OpCode::Play(_) => {}
-        //         OpCode::PlayLooped(_) => {}
-        //         OpCode::PlayLoopedScheduled(_) => {}
-        //         OpCode::PlayScheduled(_) => {}
-        //         OpCode::StopLooped(_) => {}
-        //         OpCode::StopLoopedScheduled(_) => {}
-        //         OpCode::HasEffectClip(_) => {}
-        //         OpCode::HasParticleEffect(_) => {}
-        //         OpCode::DestroyParticleEffect(_) => {}
-        //         OpCode::MoveParticleEffect(_) => {}
-        //         OpCode::SpawnParticleEffect(_) => {}
-        //         OpCode::HasSkinSprite(_) => {}
-        //         OpCode::Judge(_) => {}
-        //         OpCode::ExportValue(_) => {}
-        //         other => {
-        //             info!("Executing {:?}", &other);
-        //         }
-        //     },
-        // }
         node.execute(self)
     }
 }
