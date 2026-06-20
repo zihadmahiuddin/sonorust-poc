@@ -8,6 +8,5 @@ proc-macro = true
 
 [dependencies]
 heck = "0.5"
-quote = "1"
 quote2 = "0.9"
 syn = "2"

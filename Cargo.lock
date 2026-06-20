@@ -5269,7 +5269,6 @@ name = "sonorust-macros"
 version = "0.1.0"
 dependencies = [
  "heck",
- "quote",
  "quote2",
  "syn",
 ]
