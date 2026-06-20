@@ -1,4 +1,6 @@
-use crate::{ControlFlowState, util::int_from_f64_checked};
+use std::ops::ControlFlow;
+
+use crate::util::int_from_f64_checked;
 
 use super::*;
 
@@ -15,12 +17,12 @@ impl<E, M, S, T> Executable<E, M, S, T> for Execute {
         for &node_index in &self.nodes {
             // Check the program flow before executing the next operation.
             match executor.control() {
-                ControlFlowState::Break { .. } => {
+                ControlFlow::Break(_) => {
                     // If a break is active, stop executing further opcodes in this sequence.
                     // The Block containing this sequence will handle the break state.
                     return (executor, last_result); // Or the break value if accessible
                 }
-                ControlFlowState::Continue => {
+                ControlFlow::Continue(()) => {
                     // Proceed to execute the current operation.
                 }
             }
@@ -62,23 +64,19 @@ impl<E, M, S, T> Executable<E, M, S, T> for Block {
     {
         let flow = executor.control_mut();
 
-        if let ControlFlowState::Break { stack } = flow {
+        if let ControlFlow::Break(stack) = flow {
             if stack.len() == 1 {
                 // Consume the break for this block
-                return (executor.with_control(ControlFlowState::Continue), 0.0);
+                return (executor.with_control(ControlFlow::Continue(())), 0.0);
             } else {
                 // Bubble up break
                 let last_value = stack.pop().unwrap_or_default();
                 let stack = stack.clone();
-                return (
-                    executor.with_control(ControlFlowState::Break { stack }),
-                    last_value,
-                );
+                return (executor.with_control(ControlFlow::Break(stack)), last_value);
             }
         }
 
-        let (executor, result) = executor.execute(self.body);
-        (executor, result)
+        executor.execute(self.body)
     }
 }
 
@@ -95,16 +93,13 @@ impl<E, M, S, T> Executable<E, M, S, T> for Break {
             .unwrap_or_else(|| panic!("Expected break count to be valid usize, found {count}"));
         let (executor, value) = executor.execute(self.value);
         let mut stack = match executor.control() {
-            ControlFlowState::Continue => vec![],
-            ControlFlowState::Break { stack } => stack.clone(),
+            ControlFlow::Continue(()) => vec![],
+            ControlFlow::Break(stack) => stack.clone(),
         };
         for _ in 0usize..count {
             stack.push(value);
         }
-        (
-            executor.with_control(ControlFlowState::Break { stack }),
-            value,
-        )
+        (executor.with_control(ControlFlow::Break(stack)), value)
     }
 }
 
@@ -128,11 +123,11 @@ impl<E, M, S, T> Executable<E, M, S, T> for While {
             executor = new_executor;
 
             match executor.control_mut() {
-                ControlFlowState::Break { stack } => {
+                ControlFlow::Break(stack) => {
                     let last_value = stack.pop().unwrap_or_default();
                     return (executor, last_value);
                 }
-                ControlFlowState::Continue => {}
+                ControlFlow::Continue(()) => {}
             }
         }
     }
@@ -257,11 +252,11 @@ impl<E, M, S, T> Executable<E, M, S, T> for JumpLoop {
             branch_to_execute = self.branches[next_branch_index];
 
             match executor.control_mut() {
-                ControlFlowState::Break { stack } => {
+                ControlFlow::Continue(()) => {}
+                ControlFlow::Break(stack) => {
                     let last_value = stack.pop().unwrap_or_default();
                     return (executor, last_value);
                 }
-                ControlFlowState::Continue => {}
             }
         }
     }

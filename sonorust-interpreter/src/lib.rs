@@ -4,15 +4,13 @@ pub mod opcode;
 pub mod side_effect;
 pub(crate) mod util;
 
+use std::ops::ControlFlow;
+
 use access::{MemoryAccess, SideEffectAccess, TimingAccess};
 use node::ResolvedNode;
 use sonorust_model::entity::EntityId;
 
-#[derive(Debug)]
-pub enum ControlFlowState {
-    Continue,
-    Break { stack: Vec<f64> },
-}
+type ControlFlowState = ControlFlow<Vec<f64>>;
 
 pub trait Executable<E, M, S, T> {
     fn execute(&self, executor: E) -> (E, f64)
@@ -57,7 +55,7 @@ impl<'a, M, S, T> IterativeInterpreter<'a, M, S, T> {
             memory_access,
             side_effect_access,
             timing_access,
-            control_flow: ControlFlowState::Continue,
+            control_flow: ControlFlow::Continue(()),
         }
     }
 }
