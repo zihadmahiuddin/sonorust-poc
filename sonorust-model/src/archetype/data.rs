@@ -1,7 +1,9 @@
+use std::sync::Arc;
+
 use serde::Deserialize;
 
-pub type EngineArchetypeName = String;
-pub type EngineArchetypeDataName = String;
+pub type EngineArchetypeName = Arc<str>;
+pub type EngineArchetypeDataName = Arc<str>;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct EnginePlayDataArchetypeCallback {

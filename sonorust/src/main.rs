@@ -36,7 +36,10 @@ use sonorust_memory::access::{
 };
 use sonorust_model::{
     archetype::{
-        ArchetypeId, data::EnginePlayDataArchetype, life::ArchetypeLife, score::ArchetypeScore,
+        ArchetypeId,
+        data::{EngineArchetypeName, EnginePlayDataArchetype},
+        life::ArchetypeLife,
+        score::ArchetypeScore,
     },
     engine::{
         configuration::EngineConfiguration,
@@ -113,6 +116,9 @@ struct LevelBgmInstance(Handle<AudioInstance>);
 #[derive(Deref, DerefMut, Resource)]
 struct EntityMap(BTreeMap<EntityId, Entity>);
 
+#[derive(Deref, DerefMut, Resource)]
+struct ArchetypeMap(BTreeMap<ArchetypeId, Arc<EnginePlayDataArchetype>>);
+
 #[derive(Default, Deref, DerefMut, Resource)]
 struct SpawnQueue(BTreeMap<SpawnOrder, BTreeSet<EntityId>>);
 
@@ -121,7 +127,7 @@ struct InitializeQueue(BTreeSet<EntityId>);
 
 #[derive(Default, Resource)]
 struct SideEffects {
-    pub spawns: BTreeMap<EntityId, Vec<SpawnSideEffect>>,
+    pub spawns: Vec<(EntityId, SpawnSideEffect)>,
     pub draws: BTreeMap<EntityId, Vec<DrawSideEffect>>,
 }
 
@@ -129,10 +135,7 @@ impl SideEffectAccess for SideEffects {
     fn add(&mut self, side_effect: SideEffect) {
         match side_effect.kind {
             SideEffectKind::Spawn(spawn_side_effect) => {
-                self.spawns
-                    .entry(side_effect.entity)
-                    .and_modify(|effects| effects.push(spawn_side_effect.clone()))
-                    .or_insert(vec![spawn_side_effect]);
+                self.spawns.push((side_effect.entity, spawn_side_effect));
             }
             SideEffectKind::Draw(draw_side_effect) => {
                 self.draws
@@ -199,6 +202,7 @@ impl<'w> TimingAccess for TimingInfo<'w> {
 fn preprocessing(
     timing: TimingInfo,
     entities: Res<EntityMap>,
+    archetypes: Res<ArchetypeMap>,
     mut memory: PreprocessMemoryAccess,
     mut side_effects: ResMut<SideEffects>,
     nodes: Res<InterpreterNodes>,
@@ -206,7 +210,8 @@ fn preprocessing(
     // println!("Entering preprocessing");
     let mut callback_order_map = BTreeMap::new();
     for (entity_id, entity) in entities.0.iter() {
-        let Some(preprocess_callback) = &entity.archetype.preprocess.as_ref() else {
+        let Some(preprocess_callback) = &archetypes[&entity.archetype_id].preprocess.as_ref()
+        else {
             continue;
         };
         let order = preprocess_callback.order.unwrap_or_default();
@@ -220,7 +225,7 @@ fn preprocessing(
 
     for (_order, entity_ids) in callback_order_map {
         for (entity_id, &entity) in entity_ids.iter() {
-            let Some(preprocess) = &entity.archetype.preprocess else {
+            let Some(preprocess) = &archetypes[&entity.archetype_id].preprocess else {
                 continue;
             };
 
@@ -240,14 +245,15 @@ fn spawn_ordering(
     timing: TimingInfo,
     nodes: Res<InterpreterNodes>,
     entities: Res<EntityMap>,
+    archetypes: Res<ArchetypeMap>,
     mut side_effects: ResMut<SideEffects>,
     mut spawn_queue: ResMut<SpawnQueue>,
     mut memory: SpawnOrderMemoryAccess,
 ) {
     // println!("Entering spawn ordering");
     let mut callback_order_map = BTreeMap::new();
-    for (entity_id, entity) in entities.0.iter() {
-        let spawn_order_callback = &entity.archetype.spawn_order.as_ref();
+    for (entity_id, entity) in entities.iter() {
+        let spawn_order_callback = &archetypes[&entity.archetype_id].spawn_order.as_ref();
         let order = spawn_order_callback
             .and_then(|callback| callback.order)
             .unwrap_or_default();
@@ -259,9 +265,9 @@ fn spawn_ordering(
             .or_insert(BTreeMap::from([(entity_id, entity)]));
     }
 
-    for (_, entity_ids) in callback_order_map {
+    for entity_ids in callback_order_map.values() {
         for (entity_id, &entity) in entity_ids.iter() {
-            let order = match &entity.archetype.spawn_order {
+            let order = match &archetypes[&entity.archetype_id].spawn_order {
                 Some(spawn_order) => {
                     let mut interpreter = IterativeInterpreter::new(
                         **entity_id,
@@ -310,8 +316,40 @@ fn set_runtime_update_values(
     runtime_update.touch_count = touch_count;
 }
 
+fn process_spawn_side_effects(
+    mut entities: ResMut<EntityMap>,
+    archetypes: Res<ArchetypeMap>,
+    mut spawn_queue: ResMut<SpawnQueue>,
+    mut side_effects: ResMut<SideEffects>,
+) {
+    for (_, s) in &side_effects.spawns {
+        let next_entity_id = EntityId(
+            entities
+                .last_key_value()
+                .map(|(k, _)| k.0 + 1)
+                .unwrap_or_default(),
+        );
+        let archetype = &archetypes[&s.archetype_id];
+        entities.insert(
+            next_entity_id,
+            Entity {
+                id: next_entity_id,
+                archetype_id: s.archetype_id,
+            },
+        );
+        spawn_queue
+            .entry(SpawnOrder(0.0.into()))
+            .and_modify(|sq| {
+                sq.insert(next_entity_id);
+            })
+            .or_insert_with(|| BTreeSet::from([next_entity_id]));
+    }
+    side_effects.spawns.clear();
+}
+
 fn should_spawn_callback(
     entities: Res<EntityMap>,
+    archetypes: Res<ArchetypeMap>,
     timing: TimingInfo,
     nodes: Res<InterpreterNodes>,
     mut spawn_queue: ResMut<SpawnQueue>,
@@ -323,8 +361,9 @@ fn should_spawn_callback(
     let mut orders_to_remove = Vec::new();
 
     let mut callback_order_map = BTreeMap::new();
-    for (entity_id, entity) in entities.0.iter() {
-        let should_spawn_callback = &entity.archetype.should_spawn.as_ref();
+    for entity_id in spawn_queue.values().flatten().copied() {
+        let entity = &entities[&entity_id];
+        let should_spawn_callback = &archetypes[&entity.archetype_id].should_spawn.as_ref();
         let order = should_spawn_callback
             .and_then(|callback| callback.order)
             .unwrap_or_default();
@@ -339,9 +378,10 @@ fn should_spawn_callback(
     let mut should_spawn_map = BTreeSet::new();
     for (_order, order_entities) in callback_order_map {
         for (entity_id, entity) in order_entities {
-            let should_spawn = if let Some(should_spawn) = &entity.archetype.should_spawn {
+            let archetype = &archetypes[&entity.archetype_id];
+            let should_spawn = if let Some(should_spawn) = &archetype.should_spawn {
                 let mut interpreter = IterativeInterpreter::new(
-                    *entity_id,
+                    entity_id,
                     nodes.0.as_slice(),
                     &mut memory,
                     &mut *side_effects,
@@ -378,6 +418,7 @@ fn should_spawn_callback(
 
 fn spawning(
     entities: Res<EntityMap>,
+    archetypes: Res<ArchetypeMap>,
     mut commands: Commands,
     mut initialize_queue: ResMut<InitializeQueue>,
     mut should_spawn_events: EventReader<ShouldSpawnEvent>,
@@ -426,7 +467,7 @@ fn spawning(
             entity.clone(),
             Name::new(format!(
                 "Entity {} ({})",
-                entity.id.0, entity.archetype.name
+                entity.id.0, archetypes[&entity.archetype_id].name
             )),
         ));
     }
@@ -435,6 +476,7 @@ fn spawning(
 fn initialization(
     initialize_queue: Res<InitializeQueue>,
     entities: Res<EntityMap>,
+    archetypes: Res<ArchetypeMap>,
     timing: TimingInfo,
     nodes: Res<InterpreterNodes>,
     mut side_effects: ResMut<SideEffects>,
@@ -445,7 +487,7 @@ fn initialization(
 
     for entity_id in initialize_queue.iter() {
         let entity = &entities.0[entity_id];
-        if let Some(initialize_callback) = &entity.archetype.initialize {
+        if let Some(initialize_callback) = &archetypes[&entity.archetype_id].initialize {
             let order = initialize_callback.order.unwrap_or_default();
             callback_order_map
                 .entry(order)
@@ -459,7 +501,7 @@ fn initialization(
     for (_order, order_entities) in callback_order_map {
         for entity_id in order_entities.iter() {
             let entity = &entities.0[entity_id];
-            let Some(initialize) = &entity.archetype.initialize else {
+            let Some(initialize) = &archetypes[&entity.archetype_id].initialize else {
                 continue;
             };
             let initialize_index = initialize.index;
@@ -478,6 +520,7 @@ fn initialization(
 
 fn sequential_update(
     entities: Query<&Entity>,
+    archetypes: Res<ArchetypeMap>,
     timing: TimingInfo,
     nodes: Res<InterpreterNodes>,
     mut side_effects: ResMut<SideEffects>,
@@ -492,11 +535,19 @@ fn sequential_update(
     }
 
     for (entity_id, entity) in entity_id_to_entity_map.iter() {
-        if memory.entity_info_array.entry(entity_id).unwrap().state != EntityState::Active {
+        if memory
+            .entity_info_array
+            .entry(entity_id)
+            .map(|ei| ei.state != EntityState::Active)
+            // for entities spawned with the `Spawn` function
+            .unwrap_or(false)
+        {
             continue;
         }
 
-        if let Some(update_sequential_callback) = &entity.archetype.update_sequential {
+        if let Some(update_sequential_callback) =
+            &archetypes[&entity.archetype_id].update_sequential
+        {
             let order = update_sequential_callback.order.unwrap_or_default();
             callback_order_map
                 .entry(order)
@@ -510,7 +561,8 @@ fn sequential_update(
     for (_order, order_entities) in callback_order_map {
         for entity_id in order_entities.iter() {
             let entity = entity_id_to_entity_map[entity_id];
-            let Some(update_sequential) = &entity.archetype.update_sequential else {
+            let Some(update_sequential) = &archetypes[&entity.archetype_id].update_sequential
+            else {
                 continue;
             };
             let update_sequential_index = update_sequential.index;
@@ -531,6 +583,7 @@ fn input() {}
 
 fn parallel_update(
     entities: Query<&Entity>,
+    archetypes: Res<ArchetypeMap>,
     timing: TimingInfo,
     nodes: Res<InterpreterNodes>,
     mut side_effects: ResMut<SideEffects>,
@@ -553,7 +606,7 @@ fn parallel_update(
             continue;
         }
 
-        if let Some(update_parallel_callback) = &entity.archetype.update_parallel {
+        if let Some(update_parallel_callback) = &archetypes[&entity.archetype_id].update_parallel {
             let order = update_parallel_callback.order.unwrap_or_default();
             callback_order_map
                 .entry(order)
@@ -567,7 +620,7 @@ fn parallel_update(
     for (_order, order_entities) in callback_order_map {
         for entity_id in order_entities.iter() {
             let entity = &entity_id_to_entity_map[entity_id];
-            let Some(update_parallel) = &entity.archetype.update_parallel else {
+            let Some(update_parallel) = &archetypes[&entity.archetype_id].update_parallel else {
                 continue;
             };
             let update_parallel_index = update_parallel.index;
@@ -614,6 +667,7 @@ fn despawning(
 
 fn terminate_callback(
     entities: Query<&Entity>,
+    archetypes: Res<ArchetypeMap>,
     timing: TimingInfo,
     nodes: Res<InterpreterNodes>,
     mut side_effects: ResMut<SideEffects>,
@@ -629,7 +683,7 @@ fn terminate_callback(
 
     for despawned_entity_id in memory.entity_despawn.iter() {
         let entity = &entity_id_to_entity_map[despawned_entity_id];
-        let terminate_callback = &entity.archetype.terminate.as_ref();
+        let terminate_callback = &archetypes[&entity.archetype_id].terminate.as_ref();
         let order = terminate_callback
             .and_then(|callback| callback.order)
             .unwrap_or_default();
@@ -644,7 +698,7 @@ fn terminate_callback(
     for (_order, order_entities) in callback_order_map {
         for entity_id in order_entities.iter() {
             let entity = &entity_id_to_entity_map[entity_id];
-            let Some(terminate) = &entity.archetype.terminate else {
+            let Some(terminate) = &archetypes[&entity.archetype_id].terminate else {
                 continue;
             };
             let terminate_index = terminate.index;
@@ -845,7 +899,6 @@ struct TimeScaleChange {
 pub struct Entity {
     id: EntityId,
     archetype_id: ArchetypeId,
-    archetype: Arc<EnginePlayDataArchetype>,
 }
 
 enum SpecialArchetype {
@@ -866,7 +919,7 @@ impl TryFrom<LevelDataEntity> for SpecialArchetype {
             Some(Some(LevelDataEntityDataPayload::Value { value })) => value,
             _ => return Err(()),
         };
-        match value.archetype.as_str() {
+        match &*value.archetype {
             "#BPM_CHANGE" => {
                 let bpm = match data.remove("#BPM") {
                     Some(Some(LevelDataEntityDataPayload::Value { value })) => value,
@@ -982,7 +1035,7 @@ impl SonorustPlugin {
 
     pub fn add_memories(
         commands: &mut Commands,
-        archetypes: &HashMap<String, (usize, Arc<EnginePlayDataArchetype>)>,
+        archetypes: &BTreeMap<ArchetypeId, Arc<EnginePlayDataArchetype>>,
         entities: &BTreeMap<EntityId, Entity>,
         entity_data_map: BTreeMap<EntityId, EntityData>,
         buckets: &[Bucket],
@@ -1083,6 +1136,7 @@ impl Plugin for SonorustPlugin {
                     presentation,
                 ),
             )
+            .add_systems(PostUpdate, process_spawn_side_effects)
             .add_systems(Last, clear_side_effects);
     }
 }
@@ -1106,13 +1160,23 @@ fn pre_startup(
     let skin_data = level_info.skin_data(&sonorust_client).unwrap();
     let skin_texture_bytes = level_info.skin_texture_bytes(&sonorust_client).unwrap();
     let level_bgm_bytes = level_info.bgm_bytes(&sonorust_client).unwrap();
-    let archetypes = engine_play_data
+    let archetypes: BTreeMap<_, _> = engine_play_data
         .archetypes
         .clone()
         .into_iter()
         .enumerate()
-        .map(|(index, archetype)| (archetype.name.clone(), (index, Arc::new(archetype.clone()))))
-        .collect::<HashMap<_, _>>();
+        .map(|(index, archetype)| (ArchetypeId(index), Arc::new(archetype)))
+        .collect();
+
+    let archetype_name_map_with_id: BTreeMap<_, _> = archetypes
+        .iter()
+        .map(|(archetype_id, archetype)| {
+            (
+                Arc::clone(&archetype.name),
+                (*archetype_id, Arc::clone(&archetype)),
+            )
+        })
+        .collect();
 
     let bgm_offset = BgmOffset(level_data.bgm_offset);
 
@@ -1120,7 +1184,7 @@ fn pre_startup(
         level_data.entities.clone().into_iter().enumerate().fold(
             (BTreeMap::new(), BTreeMap::new(), Vec::new(), Vec::new()),
             |(mut entities, mut entity_data_map, mut bpm_changes, mut timescale_changes), (entity_index, entity)| {
-                if let Some((archetype_index, archetype)) = archetypes.get(&entity.archetype) {
+                if let Some((archetype_id, archetype)) = archetype_name_map_with_id.get(&entity.archetype) {
                     let mut entity_data = [0.0; EntityData::SIZE];
                     let level_data_entity_map = entity
                         .data
@@ -1149,8 +1213,7 @@ fn pre_startup(
                         Entity {
                             // name: entity.name,
                             id: entity_id,
-                            archetype_id: ArchetypeId(*archetype_index),
-                            archetype: Arc::clone(archetype),
+                            archetype_id: *archetype_id,
                         },
                     );
                     entity_data_map.insert(entity_id, EntityData::new(entity_data));
@@ -1262,7 +1325,7 @@ fn pre_startup(
         &engine_configuration,
     );
 
-    // TODO: spawn entities
+    commands.insert_resource(ArchetypeMap(archetypes));
     commands.insert_resource(EntityMap(entities));
     commands.insert_resource(interpreter_nodes);
     commands.insert_resource(bpm_changes);
