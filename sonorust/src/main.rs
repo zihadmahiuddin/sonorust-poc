@@ -110,8 +110,8 @@ struct LevelBgmSource(Handle<AudioSource>);
 #[derive(Resource)]
 struct LevelBgmInstance(Handle<AudioInstance>);
 
-// #[derive(Deref, DerefMut, Resource)]
-// struct EntityMap(BTreeMap<EntityId, Entity>);
+#[derive(Deref, DerefMut, Resource)]
+struct EntityMap(BTreeMap<EntityId, Entity>);
 
 #[derive(Default, Deref, DerefMut, Resource)]
 struct SpawnQueue(BTreeMap<SpawnOrder, BTreeSet<EntityId>>);
@@ -1362,9 +1362,6 @@ fn pre_startup(
         atlas_layout_handle: atlas_layout_handle.clone(),
     });
 }
-
-#[derive(Resource)]
-pub struct EntityMap(BTreeMap<EntityId, Entity>);
 
 // Resource to hold the pre-loaded atlas image and material
 #[derive(Resource)]
