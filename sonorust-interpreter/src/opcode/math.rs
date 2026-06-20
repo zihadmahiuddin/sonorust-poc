@@ -95,6 +95,29 @@ impl<E, M, S, T> Executable<E, M, S, T> for Divide {
     }
 }
 
+impl<E, M, S, T> Executable<E, M, S, T> for Mod {
+    fn execute(&self, executor: &mut E) -> Value
+    where
+        E: Executor<M, S, T>,
+        M: MemoryAccess,
+        S: SideEffectAccess,
+        T: TimingAccess,
+    {
+        let mut inputs = self.inputs.iter();
+
+        let Some(first) = inputs.next() else {
+            return 0.0;
+        };
+
+        fn modulo(a: Value, n: Value) -> Value {
+            ((a % n) + n) % n
+        }
+
+        let init = executor.execute(*first);
+        inputs.fold(init, |acc, &idx| modulo(acc, executor.execute(idx)))
+    }
+}
+
 impl<E, M, S, T> Executable<E, M, S, T> for Rem {
     fn execute(&self, executor: &mut E) -> Value
     where
