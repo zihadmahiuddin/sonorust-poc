@@ -176,17 +176,15 @@ where
 }
 
 #[cfg(test)]
-mod test {
-    use std::collections::HashSet;
-
-    use serde::{Deserialize, Serialize};
-
+mod tests {
     use crate::opcode::resolve_opcode;
+    use serde::{Deserialize, Serialize};
+    use std::collections::HashSet;
 
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     #[serde(untagged)]
-    pub enum JsonNode {
+    pub enum Node {
         Literal { value: f64 },
         FunctionCall { func: String, args: Vec<usize> },
     }
@@ -195,24 +193,23 @@ mod test {
     fn test_all_functions_implemented() {
         let play_data_json = include_str!("../playData.json");
 
-        let json_nodes = serde_json::from_str::<Vec<JsonNode>>(play_data_json).unwrap();
-        let failures = json_nodes
+        let nodes: Vec<Node> = serde_json::from_str(play_data_json).unwrap();
+        let failures: HashSet<_> = nodes
             .into_iter()
             .filter_map(|json_node| match json_node {
-                JsonNode::Literal { .. } => None,
-                JsonNode::FunctionCall { func, args } => {
-                    let ok = resolve_opcode(func.clone(), args).is_ok();
-                    if !ok { Some(func) } else { None }
+                Node::Literal { .. } => None,
+                Node::FunctionCall { func, args } => {
+                    resolve_opcode(func.clone(), args).is_err().then_some(func)
                 }
             })
-            .collect::<HashSet<_>>();
+            .collect();
 
         for func in &failures {
             eprintln!("{func}");
         }
 
         if !failures.is_empty() {
-            panic!("not all opcodes are imlemented");
+            panic!("not all opcodes are implemented");
         }
     }
 }

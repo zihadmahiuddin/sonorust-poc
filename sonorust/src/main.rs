@@ -1249,17 +1249,12 @@ fn pre_startup(
         .into_iter()
         .map(ResolvedNode::try_from)
         .partition::<Vec<_>, _>(|r| r.is_ok());
-    let ok_nodes = oks.into_iter().map(Result::unwrap).collect::<Vec<_>>();
-    let err_nodes = errs
-        .into_iter()
-        .map(Result::unwrap_err)
-        .collect::<HashSet<_>>();
+
+    let ok_nodes: Vec<_> = oks.into_iter().map(Result::unwrap).collect();
+    let err_nodes: Vec<_> = errs.into_iter().map(Result::unwrap_err).collect();
 
     if !err_nodes.is_empty() {
-        let mut err_node_names = err_nodes.iter().map(|e| e.0.clone()).collect::<Vec<_>>();
-        err_node_names.dedup();
-        let msg = err_node_names.join(", ");
-        panic!("Failed to resolve nodes: {msg}");
+        panic!("Failed to resolve nodes: {err_nodes:#?}");
     }
 
     let interpreter_nodes = InterpreterNodes(ok_nodes);

@@ -1,19 +1,11 @@
-use num_traits::{Bounded, FromPrimitive, PrimInt, ToPrimitive};
+use num_traits::FromPrimitive;
 
-pub(crate) fn f64_to_int_checked<T>(n: f64) -> Option<T>
+pub(crate) fn int_from_f64_checked<T>(n: f64) -> Option<T>
 where
-    T: PrimInt + Bounded + ToPrimitive + FromPrimitive,
+    T: FromPrimitive,
 {
     if n.fract() != 0.0 {
         return None;
     }
-
-    let min = T::min_value().to_f64()?;
-    let max = T::max_value().to_f64()?;
-
-    if n < min || n > max {
-        return None;
-    }
-
     T::from_f64(n)
 }

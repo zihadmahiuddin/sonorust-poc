@@ -157,10 +157,11 @@ pub fn opcode_registry(t: &mut TokenStream, input: OpcodeRegistryInput) {
                     let expected_min_len = #leading_len + #trailing_len;
 
                     if total_len < expected_min_len {
-                        panic!(
-                            "Incorrect number of arguments for {}. Expected at least {}, got {}.",
-                            stringify!(#name), expected_min_len, total_len
-                        );
+                        return Err(errors::InvalidArgumentCount {
+                            function: stringify!(#name),
+                            expected_min: expected_min_len,
+                            actual: total_len,
+                        }.into());
                     }
 
                     // Partition the runtime vector into three distinct Vecs.
@@ -265,14 +266,11 @@ pub fn opcode_registry(t: &mut TokenStream, input: OpcodeRegistryInput) {
             }
         }
 
-        #[derive(Debug, Hash, PartialEq, Eq)]
-        pub struct UnknownOpCodeError(pub String);
-
-        pub fn resolve_opcode(name: String, args: Vec<usize>) -> Result<OpCode, UnknownOpCodeError> {
+        pub fn resolve_opcode(name: String, args: Vec<usize>) -> Result<OpCode> {
             Ok(match name.as_str() {
                 #match_arms
                 _ => {
-                    return Err(UnknownOpCodeError(name));
+                    return Err(errors::UnknownOpCode(name).into());
                 },
             })
         }

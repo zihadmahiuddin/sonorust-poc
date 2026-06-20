@@ -19,6 +19,9 @@ mod side_effect;
 mod skin;
 mod timing;
 
+pub mod errors;
+pub type Result<T, E = errors::Error> = std::result::Result<T, E>;
+
 opcode_registry! {
     // Control Flow
     Execute { ..nodes },

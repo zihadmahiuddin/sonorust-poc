@@ -1,4 +1,4 @@
-use crate::util::f64_to_int_checked;
+use crate::util::int_from_f64_checked;
 
 use super::*;
 
@@ -12,10 +12,10 @@ impl<E, M, S, T> Executable<E, M, S, T> for Get {
     {
         let target_entity = executor.target_entity();
         let (executor, block_id) = executor.execute(self.block_id);
-        let block_id = f64_to_int_checked(block_id)
+        let block_id = int_from_f64_checked(block_id)
             .unwrap_or_else(|| panic!("Expected block ID to be valid u16, found {block_id}"));
         let (mut executor, index) = executor.execute(self.index);
-        let index = f64_to_int_checked(index)
+        let index = int_from_f64_checked(index)
             .unwrap_or_else(|| panic!("Expected index to be valid usize, found {index}"));
         let result = executor
             .memory_access()
@@ -35,13 +35,13 @@ impl<E, M, S, T> Executable<E, M, S, T> for GetShifted {
     {
         let target_entity = executor.target_entity();
         let (executor, block_id) = executor.execute(self.block_id);
-        let block_id = f64_to_int_checked(block_id)
+        let block_id = int_from_f64_checked(block_id)
             .unwrap_or_else(|| panic!("Expected block ID to be valid u16, found {block_id}"));
         let (executor, x) = executor.execute(self.x);
         let (executor, y) = executor.execute(self.y);
         let (mut executor, s) = executor.execute(self.s);
         let index = x + y * s;
-        let index = f64_to_int_checked(index)
+        let index = int_from_f64_checked(index)
             .unwrap_or_else(|| panic!("Expected index to be valid usize, found {index}"));
         let result = executor
             .memory_access()
@@ -61,10 +61,10 @@ impl<E, M, S, T> Executable<E, M, S, T> for Set {
     {
         let target_entity = executor.target_entity();
         let (executor, block_id) = executor.execute(self.block_id);
-        let block_id = f64_to_int_checked(block_id)
+        let block_id = int_from_f64_checked(block_id)
             .unwrap_or_else(|| panic!("Expected block ID to be valid u16, found {block_id}"));
         let (executor, index) = executor.execute(self.index);
-        let index = f64_to_int_checked(index)
+        let index = int_from_f64_checked(index)
             .unwrap_or_else(|| panic!("Expected index to be valid usize, found {index}"));
         let (mut executor, value) = executor.execute(self.value);
         executor
@@ -84,10 +84,10 @@ impl<E, M, S, T> Executable<E, M, S, T> for SetAdd {
     {
         let target_entity = executor.target_entity();
         let (executor, block_id) = executor.execute(self.block_id);
-        let block_id = f64_to_int_checked(block_id)
+        let block_id = int_from_f64_checked(block_id)
             .unwrap_or_else(|| panic!("Expected block ID to be valid u16, found {block_id}"));
         let (executor, index) = executor.execute(self.index);
-        let index = f64_to_int_checked(index)
+        let index = int_from_f64_checked(index)
             .unwrap_or_else(|| panic!("Expected index to be valid usize, found {index}"));
         let (mut executor, value) = executor.execute(self.value);
 
@@ -114,10 +114,10 @@ impl<E, M, S, T> Executable<E, M, S, T> for SetMultiply {
     {
         let target_entity = executor.target_entity();
         let (executor, block_id) = executor.execute(self.block_id);
-        let block_id = f64_to_int_checked(block_id)
+        let block_id = int_from_f64_checked(block_id)
             .unwrap_or_else(|| panic!("Expected block ID to be valid u16, found {block_id}"));
         let (executor, index) = executor.execute(self.index);
-        let index = f64_to_int_checked(index)
+        let index = int_from_f64_checked(index)
             .unwrap_or_else(|| panic!("Expected index to be valid usize, found {index}"));
         let (mut executor, value) = executor.execute(self.value);
 
@@ -144,13 +144,13 @@ impl<E, M, S, T> Executable<E, M, S, T> for SetShifted {
     {
         let target_entity = executor.target_entity();
         let (executor, block_id) = executor.execute(self.block_id);
-        let block_id = f64_to_int_checked(block_id)
+        let block_id = int_from_f64_checked(block_id)
             .unwrap_or_else(|| panic!("Expected block ID to be valid u16, found {block_id}"));
         let (executor, x) = executor.execute(self.x);
         let (executor, y) = executor.execute(self.y);
         let (executor, s) = executor.execute(self.s);
         let index = x + y * s;
-        let index = f64_to_int_checked(index)
+        let index = int_from_f64_checked(index)
             .unwrap_or_else(|| panic!("Expected index to be valid usize, found {index}"));
         let (mut executor, value) = executor.execute(self.value);
         executor

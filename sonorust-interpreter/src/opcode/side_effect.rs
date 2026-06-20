@@ -1,7 +1,7 @@
 use sonorust_model::archetype::ArchetypeId;
 
 use crate::side_effect::{DrawSideEffect, SideEffect, SideEffectKind, SpawnSideEffect};
-use crate::util::f64_to_int_checked;
+use crate::util::int_from_f64_checked;
 
 use super::*;
 
@@ -14,7 +14,7 @@ impl<E, M, S, T> Executable<E, M, S, T> for Spawn {
         T: TimingAccess,
     {
         let (mut executor, archetype_id) = executor.execute(self.archetype_id);
-        let archetype_id = ArchetypeId(f64_to_int_checked(archetype_id).unwrap_or_else(|| {
+        let archetype_id = ArchetypeId(int_from_f64_checked(archetype_id).unwrap_or_else(|| {
             panic!("Expected archetype ID to be valid usize, found {archetype_id}")
         }));
 
@@ -36,7 +36,7 @@ impl<E, M, S, T> Executable<E, M, S, T> for Draw {
         T: TimingAccess,
     {
         let (executor, sprite_id) = executor.execute(self.sprite_id);
-        let sprite_id = f64_to_int_checked(sprite_id)
+        let sprite_id = int_from_f64_checked(sprite_id)
             .unwrap_or_else(|| panic!("Expected sprite ID to be valid usize, found {sprite_id}"));
 
         let (executor, x1) = executor.execute(self.x1);

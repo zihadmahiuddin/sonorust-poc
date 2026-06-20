@@ -1,4 +1,4 @@
-use crate::{ControlFlowState, util::f64_to_int_checked};
+use crate::{ControlFlowState, util::int_from_f64_checked};
 
 use super::*;
 
@@ -91,7 +91,7 @@ impl<E, M, S, T> Executable<E, M, S, T> for Break {
         T: TimingAccess,
     {
         let (executor, count) = executor.execute(self.count);
-        let count = f64_to_int_checked(count)
+        let count = int_from_f64_checked(count)
             .unwrap_or_else(|| panic!("Expected break count to be valid usize, found {count}"));
         let (executor, value) = executor.execute(self.value);
         let mut stack = match executor.control() {
@@ -150,7 +150,7 @@ impl<E, M, S, T> Executable<E, M, S, T> for SwitchInteger {
         // dbg!(archetype);
         let (executor, discriminant) = executor.execute(self.discriminant);
         // let discriminant = discriminant.round();
-        let discriminant: usize = f64_to_int_checked(discriminant).unwrap_or_else(|| {
+        let discriminant: usize = int_from_f64_checked(discriminant).unwrap_or_else(|| {
             panic!(
                 "Expected SwitchIntegerWith discriminant to be valid usize, found {discriminant}"
             )
@@ -174,7 +174,7 @@ impl<E, M, S, T> Executable<E, M, S, T> for SwitchIntegerWithDefault {
     {
         let (executor, discriminant) = executor.execute(self.discriminant);
         let discriminant = discriminant.round(); // TODO: investigate why discriminant is 0.5 on pjsk engine...
-        let Some(discriminant) = f64_to_int_checked::<usize>(discriminant) else {
+        let Some(discriminant) = int_from_f64_checked::<usize>(discriminant) else {
             return executor.execute(self.default_consequent);
         };
 
@@ -197,7 +197,7 @@ impl<E, M, S, T> Executable<E, M, S, T> for SwitchWithDefault {
     {
         let (mut executor, discriminant) = executor.execute(self.discriminant);
         let discriminant = discriminant.round();
-        let discriminant: usize = f64_to_int_checked(discriminant).unwrap_or_else(|| {
+        let discriminant: usize = int_from_f64_checked(discriminant).unwrap_or_else(|| {
             panic!(
                 "Expected SwitchWithDefault discriminant to be valid usize, found {discriminant}"
             )
@@ -209,7 +209,7 @@ impl<E, M, S, T> Executable<E, M, S, T> for SwitchWithDefault {
             let test = chunk[0];
             let consequent = chunk[1];
             (executor, result_f64) = executor.execute(test);
-            let result: usize = f64_to_int_checked(result_f64)
+            let result: usize = int_from_f64_checked(result_f64)
                 .unwrap_or_else(|| panic!("Expected SwitchWithDefault discriminant to be valid usize, found {discriminant}"));
             if result == discriminant {
                 return executor.execute(consequent);
@@ -245,7 +245,7 @@ impl<E, M, S, T> Executable<E, M, S, T> for JumpLoop {
                 return (new_executor, next_branch);
             }
 
-            let Some(next_branch_index) = f64_to_int_checked::<usize>(next_branch) else {
+            let Some(next_branch_index) = int_from_f64_checked::<usize>(next_branch) else {
                 return (new_executor, 0.0);
             };
 

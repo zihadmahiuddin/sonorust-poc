@@ -1,7 +1,7 @@
 use sonorust_model::engine::play_data::Node;
 
 use super::*;
-use crate::opcode::{OpCode, UnknownOpCodeError, resolve_opcode};
+use crate::opcode::{OpCode, Result, errors, resolve_opcode};
 
 #[derive(Debug)]
 pub enum ResolvedNode {
@@ -25,9 +25,9 @@ impl<E, M, S, T> Executable<E, M, S, T> for ResolvedNode {
 }
 
 impl TryFrom<Node> for ResolvedNode {
-    type Error = UnknownOpCodeError;
+    type Error = errors::Error;
 
-    fn try_from(value: Node) -> Result<Self, Self::Error> {
+    fn try_from(value: Node) -> Result<Self> {
         match value {
             Node::Literal { value } => Ok(Self::Value(value)),
             Node::FunctionCall { func, args } => Ok(Self::OpCode(resolve_opcode(func, args)?)),
