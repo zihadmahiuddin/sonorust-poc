@@ -10,10 +10,11 @@ use access::{MemoryAccess, SideEffectAccess, TimingAccess};
 use node::ResolvedNode;
 use sonorust_model::entity::EntityId;
 
+type Value = f64;
 type ControlFlowState = ControlFlow<Vec<f64>>;
 
 pub trait Executable<E, M, S, T> {
-    fn execute(&self, executor: E) -> (E, f64)
+    fn execute(&self, executor: E) -> (E, Value)
     where
         E: Executor<M, S, T>,
         M: MemoryAccess,
@@ -29,7 +30,7 @@ pub trait Executor<M: MemoryAccess, S: SideEffectAccess, T: TimingAccess>: Sized
     fn target_entity(&self) -> EntityId;
     fn side_effect_access(&mut self) -> &mut S;
     fn memory_access(&mut self) -> &mut M;
-    fn execute(self, node_index: usize) -> (Self, f64);
+    fn execute(self, node_index: usize) -> (Self, Value);
 }
 
 pub struct IterativeInterpreter<'a, M, S, T> {
@@ -95,9 +96,8 @@ where
         self.memory_access
     }
 
-    fn execute(self, node_index: usize) -> (Self, f64) {
+    fn execute(self, node_index: usize) -> (Self, Value) {
         let executor = self;
-
         let node = &executor.nodes[node_index];
         // match node {
         //     ResolvedNode::Value(_) => {}
@@ -167,25 +167,15 @@ where
         //         }
         //     },
         // }
-        let (new_executor, value) = node.execute(executor);
-
-        (new_executor, value)
+        node.execute(executor)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::opcode::resolve_opcode;
-    use serde::{Deserialize, Serialize};
+    use sonorust_model::engine::play_data::Node;
     use std::collections::HashSet;
-
-    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    #[serde(untagged)]
-    pub enum Node {
-        Literal { value: f64 },
-        FunctionCall { func: String, args: Vec<usize> },
-    }
 
     #[test]
     fn test_all_functions_implemented() {

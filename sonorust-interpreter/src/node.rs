@@ -5,12 +5,12 @@ use crate::opcode::{OpCode, Result, errors, resolve_opcode};
 
 #[derive(Debug)]
 pub enum ResolvedNode {
-    Value(f64),
+    Value(Value),
     OpCode(OpCode),
 }
 
 impl<E, M, S, T> Executable<E, M, S, T> for ResolvedNode {
-    fn execute(&self, executor: E) -> (E, f64)
+    fn execute(&self, executor: E) -> (E, Value)
     where
         E: Executor<M, S, T>,
         M: MemoryAccess,
@@ -30,7 +30,7 @@ impl TryFrom<Node> for ResolvedNode {
     fn try_from(value: Node) -> Result<Self> {
         match value {
             Node::Literal { value } => Ok(Self::Value(value)),
-            Node::FunctionCall { func, args } => Ok(Self::OpCode(resolve_opcode(func, args)?)),
+            Node::FunctionCall { func, args } => resolve_opcode(func, args).map(Self::OpCode),
         }
     }
 }
