@@ -8,7 +8,7 @@ pub type EngineArchetypeDataName = Arc<str>;
 #[derive(Debug, Deserialize, Clone)]
 pub struct EnginePlayDataArchetypeCallback {
     pub index: usize,
-    pub order: Option<isize>,
+    pub order: Option<i64>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
