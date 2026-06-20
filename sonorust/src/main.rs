@@ -1251,7 +1251,7 @@ fn pre_startup(
         .partition::<Vec<_>, _>(|r| r.is_ok());
 
     let ok_nodes: Vec<_> = oks.into_iter().map(Result::unwrap).collect();
-    let err_nodes: Vec<_> = errs.into_iter().map(Result::unwrap_err).collect();
+    let err_nodes: HashSet<_> = errs.into_iter().map(Result::unwrap_err).collect();
 
     if !err_nodes.is_empty() {
         panic!("Failed to resolve nodes: {err_nodes:#?}");

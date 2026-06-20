@@ -157,7 +157,7 @@ pub fn opcode_registry(t: &mut TokenStream, input: OpcodeRegistryInput) {
                     let expected_min_len = #leading_len + #trailing_len;
 
                     if total_len < expected_min_len {
-                        return Err(errors::InvalidArgumentCount {
+                        return Err(errors::Error::InvalidArgumentCount {
                             function: stringify!(#name),
                             expected_min: expected_min_len,
                             actual: total_len,
@@ -270,7 +270,7 @@ pub fn opcode_registry(t: &mut TokenStream, input: OpcodeRegistryInput) {
             Ok(match name.as_str() {
                 #match_arms
                 _ => {
-                    return Err(errors::UnknownOpCode(name).into());
+                    return Err(errors::Error::UnknownOpCode(name).into());
                 },
             })
         }
