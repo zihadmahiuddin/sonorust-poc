@@ -41,7 +41,7 @@ opcode_registry! {
     Subtract { ..inputs },
     Multiply { ..inputs },
     Divide { ..inputs },
-    Mod { ..inputs },
+    // Mod { ..inputs }  // alias of `Rem { ..inputs }`
     Rem { ..inputs },
     Power { ..inputs },
     Clamp { min, max, value },

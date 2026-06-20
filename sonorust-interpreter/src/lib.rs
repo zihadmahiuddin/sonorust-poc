@@ -30,7 +30,7 @@ pub trait Executor<M: MemoryAccess, S: SideEffectAccess, T: TimingAccess>: Sized
     fn target_entity(&self) -> EntityId;
     fn side_effect_access(&mut self) -> &mut S;
     fn memory_access(&mut self) -> &mut M;
-    fn execute(&mut self, node_index: usize) -> Value;
+    fn execute(&mut self, idx: usize) -> Value;
 }
 
 pub struct IterativeInterpreter<'a, M, S, T> {

@@ -1,3 +1,6 @@
+use bevy::math::FloatExt;
+use std::ops::Neg;
+
 use super::*;
 use crate::Value;
 
@@ -23,7 +26,7 @@ impl<E, M, S, T> Executable<E, M, S, T> for Negate {
         T: TimingAccess,
     {
         let value = executor.execute(self.value);
-        -value
+        value.neg()
     }
 }
 
@@ -35,10 +38,7 @@ impl<E, M, S, T> Executable<E, M, S, T> for Add {
         S: SideEffectAccess,
         T: TimingAccess,
     {
-        self.inputs.iter().fold(0.0, |acc, idx| {
-            let result = executor.execute(*idx);
-            result + acc
-        })
+        self.inputs.iter().map(|idx| executor.execute(*idx)).sum()
     }
 }
 
@@ -50,18 +50,14 @@ impl<E, M, S, T> Executable<E, M, S, T> for Subtract {
         S: SideEffectAccess,
         T: TimingAccess,
     {
-        let mut inputs_iter = self.inputs.iter();
+        let mut inputs = self.inputs.iter();
 
-        let first_value = if let Some(first_node) = inputs_iter.next() {
-            executor.execute(*first_node)
-        } else {
+        let Some(first) = inputs.next() else {
             return 0.0;
         };
 
-        inputs_iter.fold(first_value, |acc, &idx| {
-            let value = executor.execute(idx);
-            acc - value
-        })
+        let init = executor.execute(*first);
+        inputs.fold(init, |acc, &idx| acc - executor.execute(idx))
     }
 }
 
@@ -73,10 +69,10 @@ impl<E, M, S, T> Executable<E, M, S, T> for Multiply {
         S: SideEffectAccess,
         T: TimingAccess,
     {
-        self.inputs.iter().fold(1.0, |acc, idx| {
-            let result = executor.execute(*idx);
-            result * acc
-        })
+        self.inputs
+            .iter()
+            .map(|idx| executor.execute(*idx))
+            .product()
     }
 }
 
@@ -88,51 +84,14 @@ impl<E, M, S, T> Executable<E, M, S, T> for Divide {
         S: SideEffectAccess,
         T: TimingAccess,
     {
-        let mut inputs_iter = self.inputs.iter();
+        let mut inputs = self.inputs.iter();
 
-        let first_value = if let Some(first_node) = inputs_iter.next() {
-            executor.execute(*first_node)
-        } else {
+        let Some(first) = inputs.next() else {
             return 0.0;
         };
 
-        inputs_iter.fold(first_value, |acc, &idx| {
-            let value = executor.execute(idx);
-            if value != 0.0 {
-                acc / value
-            } else {
-                // Decide what to do on division by zero
-                todo!()
-            }
-        })
-    }
-}
-
-impl<E, M, S, T> Executable<E, M, S, T> for Mod {
-    fn execute(&self, executor: &mut E) -> Value
-    where
-        E: Executor<M, S, T>,
-        M: MemoryAccess,
-        S: SideEffectAccess,
-        T: TimingAccess,
-    {
-        let mut inputs_iter = self.inputs.iter();
-
-        let first_value = if let Some(first_node) = inputs_iter.next() {
-            executor.execute(*first_node)
-        } else {
-            return 0.0;
-        };
-
-        inputs_iter.fold(first_value, |acc, &idx| {
-            let value = executor.execute(idx);
-            if value != 0.0 {
-                acc % value
-            } else {
-                // Decide what to do on division by zero
-                todo!()
-            }
-        })
+        let init = executor.execute(*first);
+        inputs.fold(init, |acc, &idx| acc / executor.execute(idx))
     }
 }
 
@@ -144,23 +103,14 @@ impl<E, M, S, T> Executable<E, M, S, T> for Rem {
         S: SideEffectAccess,
         T: TimingAccess,
     {
-        let mut inputs_iter = self.inputs.iter();
+        let mut inputs = self.inputs.iter();
 
-        let first_value = if let Some(first_node) = inputs_iter.next() {
-            executor.execute(*first_node)
-        } else {
+        let Some(first) = inputs.next() else {
             return 0.0;
         };
 
-        inputs_iter.fold(first_value, |acc, &idx| {
-            let value = executor.execute(idx);
-            if value != 0.0 {
-                acc % value
-            } else {
-                // Decide what to do on division by zero
-                todo!()
-            }
-        })
+        let init = executor.execute(*first);
+        inputs.fold(init, |acc, &idx| acc % executor.execute(idx))
     }
 }
 
@@ -174,14 +124,9 @@ impl<E, M, S, T> Executable<E, M, S, T> for Clamp {
     {
         let min = executor.execute(self.min);
         let max = executor.execute(self.max);
+
         let value = executor.execute(self.value);
-        if value < min {
-            min
-        } else if value > max {
-            max
-        } else {
-            value
-        }
+        value.clamp(min, max)
     }
 }
 
@@ -195,8 +140,9 @@ impl<E, M, S, T> Executable<E, M, S, T> for Lerp {
     {
         let min = executor.execute(self.min);
         let max = executor.execute(self.max);
+
         let value = executor.execute(self.value);
-        min * (1.0 - value) + max * value
+        value.lerp(max, min)
     }
 }
 
@@ -210,8 +156,9 @@ impl<E, M, S, T> Executable<E, M, S, T> for Unlerp {
     {
         let min = executor.execute(self.min);
         let max = executor.execute(self.max);
+
         let value = executor.execute(self.value);
-        (value - min) / (max - min)
+        Value::inverse_lerp(min, max, value)
     }
 }
 
@@ -227,13 +174,11 @@ impl<E, M, S, T> Executable<E, M, S, T> for UnlerpClamped {
         let max = executor.execute(self.max);
         let value = executor.execute(self.value);
 
-        let t_factor = if min == max {
-            0.0
-        } else {
-            (value - min) / (max - min)
-        };
+        if min == max {
+            return 0.0;
+        }
 
-        t_factor.clamp(0.0, 1.0)
+        Value::inverse_lerp(min, max, value).clamp(0.0, 1.0)
     }
 }
 
@@ -249,9 +194,9 @@ impl<E, M, S, T> Executable<E, M, S, T> for Power {
             return 0.0;
         }
 
-        self.inputs.iter().rfold(1.0, |acc, idx| {
-            let result = executor.execute(*idx);
-            result.powf(acc)
+        self.inputs.iter().rfold(1.0, |acc, &idx| {
+            let base = executor.execute(idx);
+            base.powf(acc)
         })
     }
 }
@@ -296,14 +241,15 @@ impl<E, M, S, T> Executable<E, M, S, T> for Remap {
         let from_max = executor.execute(self.from_max);
         let to_min = executor.execute(self.to_min);
         let to_max = executor.execute(self.to_max);
-        let value = executor.execute(self.value);
 
-        if from_max != from_min {
-            (value - from_min) / (from_max - from_min) * (to_max - to_min) + to_min
-        } else {
+        if from_max == from_min {
             // TODO: decide what to do on division by zero
-            to_min
+            return to_min;
         }
+
+        executor
+            .execute(self.value)
+            .remap(from_min, from_max, to_min, to_max)
     }
 }
 
@@ -319,15 +265,16 @@ impl<E, M, S, T> Executable<E, M, S, T> for RemapClamped {
         let from_max = executor.execute(self.from_max);
         let to_min = executor.execute(self.to_min);
         let to_max = executor.execute(self.to_max);
-        let value = executor.execute(self.value);
 
-        let value = value.clamp(from_min.min(from_max), from_min.max(from_max));
-        if from_max != from_min {
-            (value - from_min) / (from_max - from_min) * (to_max - to_min) + to_min
-        } else {
+        if from_max == from_min {
             // TODO: decide what to do on division by zero
-            to_min
+            return to_min;
         }
+
+        executor
+            .execute(self.value)
+            .clamp(from_min.min(from_max), from_min.max(from_max))
+            .remap(from_min, from_max, to_min, to_max)
     }
 }
 
