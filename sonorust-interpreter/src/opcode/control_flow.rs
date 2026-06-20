@@ -1,11 +1,11 @@
 use std::ops::ControlFlow;
 
-use crate::util::int_from_f64_checked;
+use crate::{Value, util::int_from_f64_checked};
 
 use super::*;
 
 impl<E, M, S, T> Executable<E, M, S, T> for Execute {
-    fn execute(&self, mut executor: E) -> (E, f64)
+    fn execute(&self, executor: &mut E) -> Value
     where
         E: Executor<M, S, T>,
         M: MemoryAccess,
@@ -20,31 +20,27 @@ impl<E, M, S, T> Executable<E, M, S, T> for Execute {
                 ControlFlow::Break(_) => {
                     // If a break is active, stop executing further opcodes in this sequence.
                     // The Block containing this sequence will handle the break state.
-                    return (executor, last_result); // Or the break value if accessible
+                    return last_result; // Or the break value if accessible
                 }
                 ControlFlow::Continue(()) => {
                     // Proceed to execute the current operation.
                 }
             }
-
-            let (next_executor, current_op_result) = executor.execute(node_index);
-            executor = next_executor;
-            last_result = current_op_result;
+            last_result = executor.execute(node_index);
         }
-
-        (executor, last_result)
+        last_result
     }
 }
 
 impl<E, M, S, T> Executable<E, M, S, T> for If {
-    fn execute(&self, executor: E) -> (E, f64)
+    fn execute(&self, executor: &mut E) -> Value
     where
         E: Executor<M, S, T>,
         M: MemoryAccess,
         S: SideEffectAccess,
         T: TimingAccess,
     {
-        let (executor, test) = executor.execute(self.test);
+        let test = executor.execute(self.test);
         let target = if test != 0.0 {
             self.consequent
         } else {
@@ -55,25 +51,25 @@ impl<E, M, S, T> Executable<E, M, S, T> for If {
 }
 
 impl<E, M, S, T> Executable<E, M, S, T> for Block {
-    fn execute(&self, mut executor: E) -> (E, f64)
+    fn execute(&self, executor: &mut E) -> Value
     where
         E: Executor<M, S, T>,
         M: MemoryAccess,
         S: SideEffectAccess,
         T: TimingAccess,
     {
-        let flow = executor.control_mut();
-
-        if let ControlFlow::Break(stack) = flow {
-            if stack.len() == 1 {
-                // Consume the break for this block
-                return (executor.with_control(ControlFlow::Continue(())), 0.0);
-            } else {
-                // Bubble up break
-                let last_value = stack.pop().unwrap_or_default();
-                let stack = stack.clone();
-                return (executor.with_control(ControlFlow::Break(stack)), last_value);
+        let result = match executor.control_mut() {
+            ControlFlow::Break(stack) if stack.len() == 1 => Some((0.0, ControlFlow::Continue(()))),
+            ControlFlow::Break(stack) => {
+                let last = stack.pop().unwrap_or_default();
+                Some((last, ControlFlow::Break(stack.clone())))
             }
+            _ => None,
+        };
+
+        if let Some((value, control)) = result {
+            executor.with_control(control);
+            return value;
         }
 
         executor.execute(self.body)
@@ -81,30 +77,33 @@ impl<E, M, S, T> Executable<E, M, S, T> for Block {
 }
 
 impl<E, M, S, T> Executable<E, M, S, T> for Break {
-    fn execute(&self, executor: E) -> (E, f64)
+    fn execute(&self, executor: &mut E) -> Value
     where
         E: Executor<M, S, T>,
         M: MemoryAccess,
         S: SideEffectAccess,
         T: TimingAccess,
     {
-        let (executor, count) = executor.execute(self.count);
+        let count = executor.execute(self.count);
         let count = int_from_f64_checked(count)
             .unwrap_or_else(|| panic!("Expected break count to be valid usize, found {count}"));
-        let (executor, value) = executor.execute(self.value);
+
+        let value = executor.execute(self.value);
         let mut stack = match executor.control() {
             ControlFlow::Continue(()) => vec![],
             ControlFlow::Break(stack) => stack.clone(),
         };
+
         for _ in 0usize..count {
             stack.push(value);
         }
-        (executor.with_control(ControlFlow::Break(stack)), value)
+        executor.with_control(ControlFlow::Break(stack));
+        value
     }
 }
 
 impl<E, M, S, T> Executable<E, M, S, T> for While {
-    fn execute(&self, mut executor: E) -> (E, f64)
+    fn execute(&self, executor: &mut E) -> Value
     where
         E: Executor<M, S, T>,
         M: MemoryAccess,
@@ -112,20 +111,17 @@ impl<E, M, S, T> Executable<E, M, S, T> for While {
         T: TimingAccess,
     {
         loop {
-            let (new_executor, test) = executor.execute(self.test);
+            let test = executor.execute(self.test);
 
             if test == 0.0 {
-                return (new_executor, 0.0);
+                return 0.0;
             }
 
-            let (new_executor, _ignored) = new_executor.execute(self.body);
-
-            executor = new_executor;
+            let _ = executor.execute(self.body);
 
             match executor.control_mut() {
                 ControlFlow::Break(stack) => {
-                    let last_value = stack.pop().unwrap_or_default();
-                    return (executor, last_value);
+                    return stack.pop().unwrap_or_default();
                 }
                 ControlFlow::Continue(()) => {}
             }
@@ -134,7 +130,7 @@ impl<E, M, S, T> Executable<E, M, S, T> for While {
 }
 
 impl<E, M, S, T> Executable<E, M, S, T> for SwitchInteger {
-    fn execute(&self, executor: E) -> (E, f64)
+    fn execute(&self, executor: &mut E) -> Value
     where
         E: Executor<M, S, T>,
         M: MemoryAccess,
@@ -143,7 +139,7 @@ impl<E, M, S, T> Executable<E, M, S, T> for SwitchInteger {
     {
         // dbg!(&self);
         // dbg!(archetype);
-        let (executor, discriminant) = executor.execute(self.discriminant);
+        let discriminant = executor.execute(self.discriminant);
         // let discriminant = discriminant.round();
         let discriminant: usize = int_from_f64_checked(discriminant).unwrap_or_else(|| {
             panic!(
@@ -154,20 +150,20 @@ impl<E, M, S, T> Executable<E, M, S, T> for SwitchInteger {
         if let Some(consequent_index) = self.consequents.get(discriminant) {
             executor.execute(*consequent_index)
         } else {
-            (executor, 0.0)
+            0.0
         }
     }
 }
 
 impl<E, M, S, T> Executable<E, M, S, T> for SwitchIntegerWithDefault {
-    fn execute(&self, executor: E) -> (E, f64)
+    fn execute(&self, executor: &mut E) -> Value
     where
         E: Executor<M, S, T>,
         M: MemoryAccess,
         S: SideEffectAccess,
         T: TimingAccess,
     {
-        let (executor, discriminant) = executor.execute(self.discriminant);
+        let discriminant = executor.execute(self.discriminant);
         let discriminant = discriminant.round(); // TODO: investigate why discriminant is 0.5 on pjsk engine...
         let Some(discriminant) = int_from_f64_checked::<usize>(discriminant) else {
             return executor.execute(self.default_consequent);
@@ -183,14 +179,14 @@ impl<E, M, S, T> Executable<E, M, S, T> for SwitchIntegerWithDefault {
 }
 
 impl<E, M, S, T> Executable<E, M, S, T> for SwitchWithDefault {
-    fn execute(&self, executor: E) -> (E, f64)
+    fn execute(&self, executor: &mut E) -> Value
     where
         E: Executor<M, S, T>,
         M: MemoryAccess,
         S: SideEffectAccess,
         T: TimingAccess,
     {
-        let (mut executor, discriminant) = executor.execute(self.discriminant);
+        let discriminant = executor.execute(self.discriminant);
         let discriminant = discriminant.round();
         let discriminant: usize = int_from_f64_checked(discriminant).unwrap_or_else(|| {
             panic!(
@@ -203,7 +199,7 @@ impl<E, M, S, T> Executable<E, M, S, T> for SwitchWithDefault {
         for chunk in self.tests_and_consequents.chunks_exact(2) {
             let test = chunk[0];
             let consequent = chunk[1];
-            (executor, result_f64) = executor.execute(test);
+            result_f64 = executor.execute(test);
             let result: usize = int_from_f64_checked(result_f64)
                 .unwrap_or_else(|| panic!("Expected SwitchWithDefault discriminant to be valid usize, found {discriminant}"));
             if result == discriminant {
@@ -216,7 +212,7 @@ impl<E, M, S, T> Executable<E, M, S, T> for SwitchWithDefault {
 }
 
 impl<E, M, S, T> Executable<E, M, S, T> for JumpLoop {
-    fn execute(&self, mut executor: E) -> (E, f64)
+    fn execute(&self, executor: &mut E) -> Value
     where
         E: Executor<M, S, T>,
         M: MemoryAccess,
@@ -224,38 +220,36 @@ impl<E, M, S, T> Executable<E, M, S, T> for JumpLoop {
         T: TimingAccess,
     {
         let Some(&first_branch) = self.branches.first() else {
-            return (executor, 0.0);
+            return 0.0;
         };
 
         let Some(&last_branch) = self.branches.last() else {
-            return (executor, 0.0);
+            return 0.0;
         };
 
         let mut branch_to_execute = first_branch;
 
         loop {
-            let (new_executor, next_branch) = executor.execute(branch_to_execute);
+            let next_branch = executor.execute(branch_to_execute);
 
             if branch_to_execute == last_branch {
-                return (new_executor, next_branch);
+                return next_branch;
             }
 
             let Some(next_branch_index) = int_from_f64_checked::<usize>(next_branch) else {
-                return (new_executor, 0.0);
+                return 0.0;
             };
 
             if next_branch_index >= self.branches.len() {
-                return (new_executor, 0.0);
+                return 0.0;
             }
 
-            executor = new_executor;
             branch_to_execute = self.branches[next_branch_index];
 
             match executor.control_mut() {
                 ControlFlow::Continue(()) => {}
                 ControlFlow::Break(stack) => {
-                    let last_value = stack.pop().unwrap_or_default();
-                    return (executor, last_value);
+                    return stack.pop().unwrap_or_default();
                 }
             }
         }
@@ -319,14 +313,14 @@ mod tests {
         let mut memory_access = NoOp;
         let mut side_effect_access = NoOp;
         let timing_access = NoOp;
-        let interpreter = IterativeInterpreter::new(
+        let mut interpreter = IterativeInterpreter::new(
             EntityId(0),
             &nodes,
             &mut memory_access,
             &mut side_effect_access,
             &timing_access,
         );
-        let (_executor, result) = interpreter.execute(7);
+        let result = interpreter.execute(7);
         assert_eq!(result, 1.0);
     }
 }

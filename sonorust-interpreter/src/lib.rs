@@ -14,7 +14,7 @@ type Value = f64;
 type ControlFlowState = ControlFlow<Vec<f64>>;
 
 pub trait Executable<E, M, S, T> {
-    fn execute(&self, executor: E) -> (E, Value)
+    fn execute(&self, executor: &mut E) -> Value
     where
         E: Executor<M, S, T>,
         M: MemoryAccess,
@@ -23,14 +23,14 @@ pub trait Executable<E, M, S, T> {
 }
 
 pub trait Executor<M: MemoryAccess, S: SideEffectAccess, T: TimingAccess>: Sized {
-    fn with_control(self, flow: ControlFlowState) -> Self;
+    fn with_control(&mut self, flow: ControlFlowState);
     fn control(&self) -> &ControlFlowState;
     fn control_mut(&mut self) -> &mut ControlFlowState;
     fn timing_access(&self) -> &T;
     fn target_entity(&self) -> EntityId;
     fn side_effect_access(&mut self) -> &mut S;
     fn memory_access(&mut self) -> &mut M;
-    fn execute(self, node_index: usize) -> (Self, Value);
+    fn execute(&mut self, node_index: usize) -> Value;
 }
 
 pub struct IterativeInterpreter<'a, M, S, T> {
@@ -67,9 +67,8 @@ where
     S: SideEffectAccess,
     T: TimingAccess,
 {
-    fn with_control(mut self, flow: ControlFlowState) -> Self {
+    fn with_control(&mut self, flow: ControlFlowState) {
         self.control_flow = flow;
-        self
     }
 
     fn control(&self) -> &ControlFlowState {
@@ -96,9 +95,8 @@ where
         self.memory_access
     }
 
-    fn execute(self, node_index: usize) -> (Self, Value) {
-        let executor = self;
-        let node = &executor.nodes[node_index];
+    fn execute(&mut self, node_index: usize) -> Value {
+        let node = &self.nodes[node_index];
         // match node {
         //     ResolvedNode::Value(_) => {}
         //     ResolvedNode::OpCode(opcode) => match opcode {
@@ -167,7 +165,7 @@ where
         //         }
         //     },
         // }
-        node.execute(executor)
+        node.execute(self)
     }
 }
 

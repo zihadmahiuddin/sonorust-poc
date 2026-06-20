@@ -238,7 +238,7 @@ pub fn opcode_registry(t: &mut TokenStream, input: OpcodeRegistryInput) {
         }
 
         impl<E, M, S, T> Executable<E, M, S, T> for OpCode {
-            fn execute(&self, executor: E) -> (E, f64)
+            fn execute(&self, executor: &mut E) -> crate::Value
             where
                 E: Executor<M, S, T>,
                 M: MemoryAccess,

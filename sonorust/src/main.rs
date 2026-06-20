@@ -224,7 +224,7 @@ fn preprocessing(
                 continue;
             };
 
-            let interpreter = IterativeInterpreter::new(
+            let mut interpreter = IterativeInterpreter::new(
                 **entity_id,
                 nodes.0.as_slice(),
                 &mut memory,
@@ -263,14 +263,14 @@ fn spawn_ordering(
         for (entity_id, &entity) in entity_ids.iter() {
             let order = match &entity.archetype.spawn_order {
                 Some(spawn_order) => {
-                    let interpreter = IterativeInterpreter::new(
+                    let mut interpreter = IterativeInterpreter::new(
                         **entity_id,
                         nodes.0.as_slice(),
                         &mut memory,
                         &mut *side_effects,
                         &timing,
                     );
-                    interpreter.execute(spawn_order.index).1
+                    interpreter.execute(spawn_order.index)
                 }
                 _ => 0.0,
             };
@@ -340,14 +340,14 @@ fn should_spawn_callback(
     for (_order, order_entities) in callback_order_map {
         for (entity_id, entity) in order_entities {
             let should_spawn = if let Some(should_spawn) = &entity.archetype.should_spawn {
-                let interpreter = IterativeInterpreter::new(
+                let mut interpreter = IterativeInterpreter::new(
                     *entity_id,
                     nodes.0.as_slice(),
                     &mut memory,
                     &mut *side_effects,
                     &timing,
                 );
-                interpreter.execute(should_spawn.index).1 != 0.0
+                interpreter.execute(should_spawn.index) != 0.0
             } else {
                 true
             };
@@ -465,7 +465,7 @@ fn initialization(
             };
             let initialize_index = initialize.index;
 
-            let interpreter = IterativeInterpreter::new(
+            let mut interpreter = IterativeInterpreter::new(
                 *entity_id,
                 nodes.0.as_slice(),
                 &mut memory,
@@ -516,7 +516,7 @@ fn sequential_update(
             };
             let update_sequential_index = update_sequential.index;
 
-            let interpreter = IterativeInterpreter::new(
+            let mut interpreter = IterativeInterpreter::new(
                 **entity_id,
                 nodes.0.as_slice(),
                 &mut memory,
@@ -573,7 +573,7 @@ fn parallel_update(
             };
             let update_parallel_index = update_parallel.index;
 
-            let interpreter = IterativeInterpreter::new(
+            let mut interpreter = IterativeInterpreter::new(
                 *entity_id,
                 nodes.0.as_slice(),
                 &mut memory,
@@ -650,7 +650,7 @@ fn terminate_callback(
             };
             let terminate_index = terminate.index;
 
-            let interpreter = IterativeInterpreter::new(
+            let mut interpreter = IterativeInterpreter::new(
                 *entity_id,
                 nodes.0.as_slice(),
                 &mut memory,

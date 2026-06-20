@@ -10,7 +10,7 @@ pub enum ResolvedNode {
 }
 
 impl<E, M, S, T> Executable<E, M, S, T> for ResolvedNode {
-    fn execute(&self, executor: E) -> (E, Value)
+    fn execute(&self, executor: &mut E) -> Value
     where
         E: Executor<M, S, T>,
         M: MemoryAccess,
@@ -18,7 +18,7 @@ impl<E, M, S, T> Executable<E, M, S, T> for ResolvedNode {
         T: TimingAccess,
     {
         match self {
-            ResolvedNode::Value(value) => (executor, *value),
+            ResolvedNode::Value(value) => *value,
             ResolvedNode::OpCode(op_code) => op_code.execute(executor),
         }
     }
