@@ -846,7 +846,6 @@ pub struct Entity {
     id: EntityId,
     archetype_id: ArchetypeId,
     archetype: Arc<EnginePlayDataArchetype>,
-    data: EntityData,
 }
 
 enum SpecialArchetype {
@@ -985,6 +984,7 @@ impl SonorustPlugin {
         commands: &mut Commands,
         archetypes: &HashMap<String, (usize, Arc<EnginePlayDataArchetype>)>,
         entities: &BTreeMap<EntityId, Entity>,
+        entity_data_map: BTreeMap<EntityId, EntityData>,
         buckets: &[Bucket],
         engine_configuration: &EngineConfiguration,
     ) {
@@ -1014,11 +1014,7 @@ impl SonorustPlugin {
 
         let entity_memory_array = EntityMemoryArray::new(entities.keys().copied());
         // TODO: maybe construct the data and give it to the block directly instead of cloning
-        let entity_data_array = EntityDataArray::new(
-            entities
-                .values()
-                .map(|entity| (entity.id, entity.data.clone())),
-        );
+        let entity_data_array = EntityDataArray::new(entity_data_map.into_iter());
         let entity_shared_memory_array = EntitySharedMemoryArray::new(entities.len());
         let entity_info_array = EntityInfoArray::new(
             entities
@@ -1120,20 +1116,20 @@ fn pre_startup(
 
     let bgm_offset = BgmOffset(level_data.bgm_offset);
 
-    let (entities, mut bpm_changes, mut time_scale_changes) =
+    let (entities, entity_data_map, mut bpm_changes, mut time_scale_changes) =
         level_data.entities.clone().into_iter().enumerate().fold(
-            (BTreeMap::new(), Vec::new(), Vec::new()),
-            |(mut entities, mut bpm_changes, mut timescale_changes), (entity_index, entity)| {
+            (BTreeMap::new(), BTreeMap::new(), Vec::new(), Vec::new()),
+            |(mut entities, mut entity_data_map, mut bpm_changes, mut timescale_changes), (entity_index, entity)| {
                 if let Some((archetype_index, archetype)) = archetypes.get(&entity.archetype) {
                     let mut entity_data = [0.0; EntityData::SIZE];
-                    let entity_data_map = entity
+                    let level_data_entity_map = entity
                         .data
                         .iter()
                         .map(|a| (&a.name, &a.payload))
                         .collect::<HashMap<_, _>>();
 
                     for import in &archetype.imports {
-                        if let Some(Some(payload)) = entity_data_map.get(&import.name) {
+                        if let Some(Some(payload)) = level_data_entity_map.get(&import.name) {
                             match payload {
                                 LevelDataEntityDataPayload::Reference { reference } => {
                                     warn!(
@@ -1155,9 +1151,9 @@ fn pre_startup(
                             id: entity_id,
                             archetype_id: ArchetypeId(*archetype_index),
                             archetype: Arc::clone(archetype),
-                            data: EntityData::new(entity_data),
                         },
                     );
+                    entity_data_map.insert(entity_id, EntityData::new(entity_data));
                 } else if let Ok(special_archetype) = SpecialArchetype::try_from(entity) {
                     match special_archetype {
                         SpecialArchetype::BpmChange { beat, bpm } => {
@@ -1171,7 +1167,7 @@ fn pre_startup(
                     unreachable!()
                 }
 
-                (entities, bpm_changes, timescale_changes)
+                (entities, entity_data_map, bpm_changes, timescale_changes)
             },
         );
 
@@ -1262,6 +1258,7 @@ fn pre_startup(
         &mut commands,
         &archetypes,
         &entities,
+        entity_data_map,
         &engine_play_data.buckets,
         &engine_configuration,
     );
