@@ -1237,7 +1237,6 @@ fn pre_startup(
         changes: time_scale_changes,
     };
 
-    let interpreter_block_stack = InterpreterBlockStack::default();
     let (oks, errs) = engine_play_data
         .nodes
         .clone()
@@ -1265,7 +1264,6 @@ fn pre_startup(
 
     // TODO: spawn entities
     commands.insert_resource(EntityMap(entities));
-    commands.insert_resource(interpreter_block_stack);
     commands.insert_resource(interpreter_nodes);
     commands.insert_resource(bpm_changes);
     commands.insert_resource(time_scale_changes);
@@ -1419,9 +1417,6 @@ fn apply_sonolus_transform_expression(
 
 #[derive(Deref, Resource)]
 struct InterpreterNodes(Vec<ResolvedNode>);
-
-#[derive(Deref, DerefMut, Default, Resource)]
-struct InterpreterBlockStack(usize);
 
 #[derive(Deref, DerefMut, Resource)]
 struct BgmOffset(f64);
