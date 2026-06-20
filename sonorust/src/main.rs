@@ -395,7 +395,6 @@ fn spawning(
         };
 
         let entity = &entities.0[entity_id];
-        println!("Spawn entity {} ({})", **entity_id, entity.archetype.name);
 
         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all());
         // Initialize with a dummy quad that will be updated
@@ -1137,8 +1136,8 @@ fn pre_startup(
                         if let Some(Some(payload)) = entity_data_map.get(&import.name) {
                             match payload {
                                 LevelDataEntityDataPayload::Reference { reference } => {
-                                    println!(
-                                        "Level Data Entity Data Payload by reference {reference}"
+                                    warn!(
+                                        "TODO: Level Data Entity Data Payload by reference {reference}"
                                     );
                                 }
                                 LevelDataEntityDataPayload::Value { value } => {
