@@ -1,10 +1,11 @@
 use std::collections::{HashMap as Map, HashSet as Set};
 
+use crate::utils::parse_;
 use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
 use quote2::*;
 use syn::{
-    parse::{Parse, ParseBuffer, ParseStream, Result},
+    parse::{Parse, ParseStream, Result},
     *,
 };
 
@@ -20,18 +21,18 @@ impl Parse for MemoryAccessInput {
         let c;
         bracketed!(c in input);
         while !c.is_empty() {
-            blocks.push(parse_ident::<Token![,]>(&c)?);
+            blocks.push(parse_::<Ident, Token![,]>(&c)?);
         }
 
         let mut mutability_by_stage = Map::new();
 
         while !input.is_empty() {
-            let stage_name = parse_ident::<Token![:]>(input)?;
+            let stage_name = parse_::<Ident, Token![:]>(input)?;
 
             let c;
             bracketed!(c in input);
             while !c.is_empty() {
-                let block_name = parse_ident::<Token![,]>(&c)?;
+                let block_name = parse_::<Ident, Token![,]>(&c)?;
 
                 mutability_by_stage
                     .entry(stage_name.clone())
@@ -47,13 +48,6 @@ impl Parse for MemoryAccessInput {
             mutability_by_stage,
         })
     }
-}
-
-fn parse_ident<Sep: Parse>(input: &ParseBuffer<'_>) -> Result<Ident> {
-    let name = input.parse()?;
-    // Optional comma after individual item
-    let _ = input.parse::<Sep>();
-    Ok(name)
 }
 
 pub fn generate_memory_access(t: &mut TokenStream, input: MemoryAccessInput) {

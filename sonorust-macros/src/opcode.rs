@@ -1,10 +1,12 @@
 extern crate proc_macro;
 
+use crate::utils::parse_;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::Token;
-use syn::parse::{Parse, ParseStream, Result};
-use syn::{Ident, braced};
+use syn::{
+    parse::{Parse, ParseStream, Result},
+    *,
+};
 
 pub struct OpcodeRegistryInput {
     entries: Vec<OpcodeEntry>,
@@ -24,8 +26,7 @@ impl Parse for OpcodeRegistryInput {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut entries = Vec::new();
         while !input.is_empty() {
-            entries.push(input.parse()?);
-            input.parse::<Token![,]>()?;
+            entries.push(parse_::<_, Token![,]>(input)?);
         }
         Ok(Self { entries })
     }
@@ -34,15 +35,12 @@ impl Parse for OpcodeRegistryInput {
 impl Parse for OpcodeEntry {
     fn parse(input: ParseStream) -> Result<Self> {
         let name: Ident = input.parse()?;
-        let content;
-        braced!(content in input);
-
         let mut fields = Vec::new();
-        while !content.is_empty() {
-            fields.push(content.parse()?);
-            if content.peek(Token![,]) {
-                content.parse::<Token![,]>()?;
-            }
+
+        let c;
+        braced!(c in input);
+        while !c.is_empty() {
+            fields.push(parse_::<_, Token![,]>(&c)?);
         }
 
         Ok(Self { name, fields })
@@ -53,11 +51,9 @@ impl Parse for OpcodeField {
     fn parse(input: ParseStream) -> Result<Self> {
         if input.peek(Token![..]) {
             input.parse::<Token![..]>()?;
-            let ident = input.parse()?;
-            Ok(OpcodeField::Rest(ident))
+            Ok(OpcodeField::Rest(input.parse()?))
         } else {
-            let ident = input.parse()?;
-            Ok(OpcodeField::Normal(ident))
+            Ok(OpcodeField::Normal(input.parse()?))
         }
     }
 }

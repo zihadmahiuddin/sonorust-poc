@@ -1,8 +1,9 @@
-use proc_macro::TokenStream;
-use quote2::proc_macro2;
-
 mod memory;
 mod opcode;
+mod utils;
+
+use proc_macro::TokenStream;
+use quote2::proc_macro2;
 
 #[proc_macro]
 pub fn generate_memory_access(input: TokenStream) -> TokenStream {
